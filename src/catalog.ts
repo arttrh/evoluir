@@ -1,4 +1,5 @@
 import { uid, type Track } from "./model";
+import { springCloudModules } from "./study-content";
 type TopicSeed = {
   title: string;
   criteria: string;
@@ -256,6 +257,7 @@ const seeds: Record<
     ],
   },
 };
+seeds["Spring Cloud"].modules = springCloudModules;
 export const templateNames = Object.keys(seeds);
 export function createTrack(title: string, template: string): Track {
   const subject = title
@@ -305,4 +307,24 @@ export function createTrack(title: string, template: string): Track {
       })),
     })),
   };
+}
+
+export function expandTrack(track: Track): Track {
+  const full = createTrack(track.title, "auto");
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+  const existingTopics = new Set(
+    track.modules.flatMap((m) => m.topics.map((t) => normalize(t.title))),
+  );
+  const modules = full.modules
+    .map((m) => ({
+      ...m,
+      topics: m.topics.filter((t) => !existingTopics.has(normalize(t.title))),
+    }))
+    .filter((m) => m.topics.length);
+  return { ...track, modules: [...track.modules, ...modules] };
 }

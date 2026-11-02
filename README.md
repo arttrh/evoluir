@@ -1,25 +1,30 @@
 # Evoluir
 
-Um organizador pessoal para corpo, estudos e carreira. Interface responsiva, clara e sem gamificação, com navegação inferior e visual de vidro translúcido.
+[**Abrir aplicativo**](https://evoluir-hazel.vercel.app)
 
-## O que funciona
+Um espaço pessoal para corpo, estudos e carreira. PWA responsivo, com fundo claro, detalhes em bege, vidro translúcido, navegação inferior e animações com GSAP. Sem pontos ou recompensas.
 
-- Dashboard diário, tarefas por área, conclusão, reabertura e consistência dos últimos sete dias.
-- Registro manual e edição de corridas, ritmo calculado, histórico, meta semanal e evolução semanal/mensal.
-- Trilhas editáveis para Java, Docker, Spring Cloud e arquitetura, com documentação oficial, exercícios, critérios e revisões. Outros temas podem ser organizados manualmente.
-- Vagas, candidaturas, contatos, observações e seis status de acompanhamento.
-- Objetivos de longo prazo, metas semanais, tarefas diárias, disponibilidade e histórico de reagendamentos.
-- Exportação e restauração de backups JSON validados.
-- PWA com recursos locais em cache, fontes incluídas e uso offline após o primeiro carregamento.
+## Funcionalidades
 
-## Executar
+- Tarefas por área, conclusão, reabertura, planejamento semanal e histórico de reagendamentos.
+- Corridas manuais, ritmo calculado, meta semanal, evolução por semana/mês e resumo mensal.
+- Trilhas editáveis, prática, critérios e revisão. Spring Cloud tem 8 módulos e 20 tópicos. Trilhas antigas podem ser ampliadas sem perder progresso.
+- Busca de referências: documentação oficial do catálogo primeiro, discussões com respostas aceitas pela API pública do Stack Exchange depois. Roadmap.sh aparece como referência externa, sem cópia ou scraping.
+- Definição de tópicos prioritários para montar uma trilha editável a partir de um assunto. A aplicação não usa IA para inventar uma formação ou avaliar a qualidade de qualquer link na internet.
+- Vagas, candidaturas, contatos e objetivos profissionais.
+- Comandos de voz em português, sempre com prévia e confirmação. Exemplos: “Concluí revisar currículo” e “Corri cinco quilômetros em trinta e cinco minutos”. Há alternativa por texto e pelo ditado do teclado.
+- PWA offline para os dados manuais, fontes locais, exportação e restauração de backup.
 
-Requer Node.js 22.12 ou superior.
+## Executar e validar
+
+Node.js 22.12 ou superior:
 
 ```sh
 npm ci
 npm run dev
 ```
+
+O servidor de desenvolvimento atende também `/api/study-search` e `/api/strava`, usando os mesmos handlers da Vercel. Sem credenciais Strava, o aplicativo informa que a conexão ainda não está ativada. Buscas online dependem da disponibilidade e quota do Stack Exchange; o catálogo oficial é o fallback.
 
 ```sh
 npm test
@@ -28,22 +33,27 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-O build estático fica em `dist/`. O arquivo `vercel.json` configura a hospedagem, incluindo cabeçalhos de segurança. A integração contínua verifica os testes, a compilação e os fluxos no navegador.
+Testes incluem a lógica de voz, ambiguidade, validação de dados, preservação de progresso, backup, falhas de armazenamento, acessibilidade, movimento reduzido, tamanhos de tela, OAuth, criptografia, CSRF e consulta privada de atividades. O reconhecimento físico do microfone e o Safari/iOS exigem validação no aparelho.
 
-## Dados e privacidade
+## Configurar a consulta Strava
 
-Os registros ficam no armazenamento local do navegador, sem conta, backend, telemetria ou sincronização entre dispositivos. Nenhum registro pessoal é enviado à hospedagem. Faça backups: limpar os dados do navegador ou perder o aparelho pode apagar o histórico. O modo privado pode não oferecer armazenamento persistente.
+Existe integração oficial Nike → Strava para **novas** corridas; ela não migra o histórico anterior. Configure no NRC: Perfil → Configurações → Parceiros → Strava. [Instruções oficiais](https://support.strava.com/en-us/articles/15401850-nike-and-strava).
 
-Uma restauração substitui os registros atuais após confirmação e conserva uma cópia anterior na chave local `evoluir.before-import`. Backups inválidos são recusados antes de modificar os dados. Quando a leitura do armazenamento falha, o aplicativo oferece o download dos dados originais para recuperação.
+1. Cadastre uma aplicação em [Strava API Settings](https://www.strava.com/settings/api). Confira os requisitos e limites do seu nível de acesso; um app novo pode ter acesso apenas ao próprio atleta.
+2. Use `evoluir-hazel.vercel.app` como Authorization Callback Domain. O retorno é `https://evoluir-hazel.vercel.app/api/strava?op=callback`.
+3. Nas variáveis **server-only** da Vercel, configure `APP_ORIGIN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` e `STRAVA_SESSION_SECRET`. O último deve ter no mínimo 32 caracteres aleatórios. Consulte `.env.example`; nunca use prefixo `VITE_`, nem inclua valores reais no Git.
+4. Faça um novo deploy para aplicar as variáveis. Na área Corrida, leia o consentimento e conecte sua própria conta.
+
+OAuth usa state com validade curta, verificação de origem na revogação e cookies Secure/HttpOnly/SameSite=Lax. Tokens são criptografados com AES-256-GCM e nunca enviados ao JavaScript. A aplicação consulta apenas o atleta autorizado; exibe corridas entre as 100 atividades mais recentes. Não armazena nem exporta essas atividades e não as combina com métricas locais, voz ou inteligência artificial. Ao sair da tela, a consulta é descartada. A desconexão revoga a autorização e limpa a sessão. Consulte [a política atual da API](https://www.strava.com/legal/api_policy).
+
+## Privacidade e persistência
+
+Registros manuais ficam neste navegador, sem sincronização automática. Faça backups: limpar o navegador ou perder o aparelho pode apagar o histórico. O backup contém seus registros manuais; não contém tokens, áudio nem atividades consultadas no Strava.
+
+Ao restaurar, a cópia anterior é preservada na chave `evoluir.before-import`. Backups inválidos são recusados antes de alterar os dados. A tela de recuperação permite baixar dados corrompidos e restaurar um backup válido.
+
+O reconhecimento de voz depende do navegador e das permissões. Alguns navegadores processam o áudio online. O Evoluir não grava áudio e não escuta em segundo plano. A busca envia somente o assunto pesquisado ao Stack Exchange. [Política de privacidade](https://evoluir-hazel.vercel.app/privacy.html).
 
 ## Instalar no iPhone
 
-Abra o endereço HTTPS no Safari, toque em Compartilhar e escolha **Adicionar à Tela de Início**. Abra uma vez com internet para preparar o cache offline. Links externos de estudo e vagas exigem conexão.
-
-## Integrações
-
-O MVP não depende do Nike Run Club nem de uma API do roadmap.sh. As corridas são manuais. Roadmaps são referências externas por link; seu conteúdo não é redistribuído. As trilhas são modelos curados editáveis, sem geração por IA ou chamada a APIs pagas.
-
-## Limites
-
-A emulação de iPhone nos testes usa Chromium e não substitui testes em Safari/iOS real. Instalação na tela inicial, teclado e efeitos de vidro devem ser conferidos no aparelho. A aplicação oculta a barra visual de rolagem e preserva a rolagem nativa e o acesso por teclado.
+Safari → Compartilhar → **Adicionar à Tela de Início**. Abra uma vez com internet para preparar o cache. Registros manuais funcionam offline; busca de fontes, voz online e Strava podem precisar de internet. A barra de rolagem visual é ocultada, preservando toque, mouse e teclado. Preferência por redução de movimento é respeitada.

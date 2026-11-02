@@ -1,3 +1,8 @@
+import { RunInsights } from "./components/RunInsights";
+import { VoiceCommand } from "./components/VoiceCommand";
+import { StudyExplorer } from "./components/StudyExplorer";
+import { StravaPanel } from "./components/StravaPanel";
+import { usePageMotion } from "./motion";
 import {
   useEffect,
   useId,
@@ -9,6 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  Mic,
   House,
   Footprints,
   BookOpen,
@@ -218,6 +224,7 @@ function Modal({
 export default function App() {
   const { data, update, restore, error, ready } = useData();
   const [page, setPage] = useState<Page>("Hoje");
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
@@ -229,6 +236,19 @@ export default function App() {
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  usePageMotion(mainRef, page, ready);
+  useEffect(() => {
+    const result = new URLSearchParams(location.search).get("strava");
+    if (result) {
+      setPage("Corrida");
+      setNotice(
+        result === "connected"
+          ? "Strava conectado. Consulte suas corridas."
+          : "A conexão não foi concluída. Tente novamente e confira as permissões.",
+      );
+      history.replaceState(null, "", location.pathname);
+    }
+  }, []);
   useEffect(() => {
     const sync = () => {
       setNow(today());
@@ -1300,6 +1320,13 @@ export default function App() {
             evoluir<span>.</span>
           </button>
           <div className="topbar-right">
+            <button
+              className="icon-button voice-trigger"
+              onClick={() => setVoiceOpen(true)}
+              aria-label="Comando de voz"
+            >
+              <Mic size={20} />
+            </button>
             {!online && (
               <span className="offline">
                 <WifiOff size={14} />
@@ -1509,6 +1536,7 @@ export default function App() {
                   <Plus size={18} />
                   Registrar corrida
                 </Button>
+                <StravaPanel />
                 <section>
                   <div className="section-heading">
                     <h2>Próximo treino</h2>
@@ -1691,6 +1719,11 @@ export default function App() {
           )}
           {page === "Estudos" && (
             <>
+              <StudyExplorer
+                track={activeTrack}
+                onChange={change}
+                onCreated={setSelectedTrack}
+              />
               {data.tracks.length > 0 && (
                 <div className="track-selector">
                   <Field label="Trilha ativa">
@@ -1821,6 +1854,49 @@ export default function App() {
                     </section>
                   </div>
                   <section className="modules">
+                    <div className="study-current">
+                      <span className="eyebrow">Próximo passo</span>
+                      <h3>
+                        {activeTopic?.title ||
+                          "Trilha concluída. Hora de revisar."}
+                      </h3>
+                      <p className="muted small">
+                        {activeTopic?.exercise ||
+                          "Consulte as revisões e consolide seu projeto."}
+                      </p>
+                      {activeTopic && (
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            const topic = document.getElementById(
+                              `topic-${activeTopic.id}`,
+                            );
+                            if (topic instanceof HTMLDetailsElement) {
+                              topic.open = true;
+                              topic.scrollIntoView({
+                                block: "center",
+                                behavior: matchMedia(
+                                  "(prefers-reduced-motion: reduce)",
+                                ).matches
+                                  ? "instant"
+                                  : "smooth",
+                              });
+                              topic
+                                .querySelector("summary")
+                                ?.focus({ preventScroll: true });
+                            }
+                          }}
+                        >
+                          Continuar tópico
+                          <ArrowRight size={15} />
+                        </button>
+                      )}
+                      <span className="study-count">
+                        {activeTrack.modules.length} módulos ·{" "}
+                        {trackProgress(activeTrack).total} tópicos · prática em
+                        cada etapa
+                      </span>
+                    </div>
                     <div className="section-heading">
                       <h2>Sua trilha</h2>
                       <button
@@ -1884,6 +1960,7 @@ export default function App() {
                         {m.topics.map((tp) => (
                           <details
                             key={tp.id}
+                            id={`topic-${tp.id}`}
                             className="topic"
                             open={undefined}
                           >
@@ -2452,6 +2529,13 @@ export default function App() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Navegação principal">
+        <span
+          className="nav-indicator"
+          aria-hidden="true"
+          style={{
+            transform: `translateX(${navigation.findIndex(([label]) => label === page) * 100}%)`,
+          }}
+        />
         {navigation.map(([label, Icon]) => (
           <button
             key={label}
@@ -2471,6 +2555,15 @@ export default function App() {
       )}
       {backupInput()}
       {renderEditor()}
+      {voiceOpen && (
+        <Modal title="Seu comando, sua ação" close={() => setVoiceOpen(false)}>
+          <VoiceCommand
+            data={data}
+            onChange={change}
+            close={() => setVoiceOpen(false)}
+          />
+        </Modal>
+      )}
     </>
   );
 }

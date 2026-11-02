@@ -98,10 +98,10 @@ test("cria trilha, conclui tópico e agenda revisão", async ({ page }) => {
     .first()
     .click();
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await expect(page.getByText("1 de 3 tópicos concluídos")).toBeVisible();
+  await expect(page.getByText("1 de 20 tópicos concluídos")).toBeVisible();
   await page.reload();
   await nav(page, "Estudos");
-  await expect(page.getByText("1 de 3 tópicos concluídos")).toBeVisible();
+  await expect(page.getByText("1 de 20 tópicos concluídos")).toBeVisible();
 });
 test("salva vaga, atualiza status e não executa notas", async ({ page }) => {
   await nav(page, "Emprego");
@@ -354,15 +354,236 @@ test("recupera armazenamento corrompido usando backup válido", async ({
   );
   await page.evaluate(() => localStorage.setItem("evoluir.data.v1", "{erro"));
   await page.reload();
-  await page
-    .getByLabel("Arquivo de backup")
-    .setInputFiles({
-      name: "recuperacao.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(raw),
-    });
+  await page.getByLabel("Arquivo de backup").setInputFiles({
+    name: "recuperacao.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(raw),
+  });
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
   await expect(
     page.getByText("Registro recuperado", { exact: true }).last(),
   ).toBeVisible();
+});
+
+test("voz só altera uma tarefa depois da confirmação", async ({ page }) => {
+  await addTask(page, "Revisar currículo", "emprego");
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Concluí revisar currículo");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("evoluir.data.v1")!).tasks[0].status,
+    ),
+  ).toBe("pendente");
+  await page
+    .getByRole("button", { name: "Confirmar conclusão", exact: true })
+    .click();
+  await expect(page.getByText("1 de 1 feitas")).toBeVisible();
+});
+
+test("voz registra corrida e conclui treino somente quando vinculado", async ({
+  page,
+}) => {
+  await addTask(page, "Correr 5 km", "corpo");
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Corri cinco quilômetros em trinta e cinco minutos");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  await page
+    .getByLabel("Concluir também um treino?")
+    .selectOption({ label: "Correr 5 km" });
+  await page
+    .getByRole("button", { name: "Confirmar corrida", exact: true })
+    .click();
+  await expect(page.getByText("1 de 1 feitas")).toBeVisible();
+  const d = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!),
+  );
+  expect(d.runs[0].distance).toBe(5);
+  expect(d.runs[0].seconds).toBe(2100);
+});
+
+test("recusa comando vago e mostra erro de permissão do microfone", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    (window as any).SpeechRecognition = class {
+      onerror: any;
+      onend: any;
+      start() {
+        this.onerror?.({ error: "not-allowed" });
+        this.onend?.();
+      }
+      abort() {}
+      stop() {}
+    };
+  });
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Falar comando", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("Permita o microfone");
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Já bati minha meta");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  await expect(page.getByText(/Nenhuma ação foi realizada/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirmar corrida", exact: true }),
+  ).not.toBeVisible();
+});
+
+test("busca fontes reais pelo endpoint e monta trilha com tópicos escolhidos", async ({
+  page,
+}) => {
+  await page.route("**/api/study-search?*", (route) =>
+    route.fulfill({
+      json: {
+        sources: [
+          {
+            title: "Spring Cloud Gateway",
+            url: "https://docs.spring.io/spring-cloud-gateway/reference/",
+            why: "Use depois dos fundamentos para configurar rotas e filtros.",
+            kind: "official",
+          },
+        ],
+        warning: "",
+      },
+    }),
+  );
+  await nav(page, "Estudos");
+  await page.getByLabel("Assunto para pesquisar").fill("Spring Cloud");
+  await page
+    .getByRole("button", { name: "Buscar fontes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: /Spring Cloud Gateway/ }),
+  ).toBeVisible();
+  await page
+    .getByLabel("Quais tópicos você quer priorizar? (opcional)")
+    .fill("Eureka, Gateway");
+  await page
+    .getByRole("button", { name: "Criar trilha deste assunto", exact: true })
+    .click();
+  const d = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!),
+  );
+  expect(d.tracks[0].modules.map((m: any) => m.title)).toEqual([
+    "Eureka",
+    "Gateway",
+  ]);
+  expect(d.tracks[0].modules[0].topics[0].resources[0].url).toContain(
+    "spring.io",
+  );
+});
+
+test("falha de busca preserva catálogo e não cria integração falsa com Strava", async ({
+  page,
+}) => {
+  await page.route("**/api/study-search?*", (route) => route.abort());
+  await page.route("**/api/strava?op=status", (route) =>
+    route.fulfill({ json: { configured: false, connected: false } }),
+  );
+  await nav(page, "Estudos");
+  await page.getByLabel("Assunto para pesquisar").fill("Spring Cloud");
+  await page
+    .getByRole("button", { name: "Buscar fontes", exact: true })
+    .click();
+  await expect(page.getByText(/Sem resposta da busca online/)).toBeVisible();
+  await nav(page, "Corrida");
+  await expect(
+    page.getByText("Conexão automática ainda não ativada"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Conectar minha conta Strava" }),
+  ).not.toBeVisible();
+});
+
+test("Strava exibe métricas autenticadas sem persistir atividades em backup", async ({
+  page,
+}) => {
+  await page.route("**/api/strava?op=status", (route) =>
+    route.fulfill({ json: { configured: true, connected: true } }),
+  );
+  await page.route("**/api/strava?op=activities", (route) =>
+    route.fulfill({
+      json: {
+        activities: [
+          {
+            id: 12345,
+            name: "Corrida externa de teste",
+            distance: 5000,
+            movingTime: 1800,
+            elapsedTime: 1900,
+            date: "2026-11-02T12:00:00Z",
+            elevation: 20,
+            heartRate: 140,
+            device: null,
+            url: "https://www.strava.com/activities/12345",
+          },
+        ],
+      },
+    }),
+  );
+  await nav(page, "Corrida");
+  await page
+    .getByRole("button", { name: "Consultar corridas", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Corrida externa de teste" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => localStorage.getItem("evoluir.data.v1")),
+  ).toBeNull();
+  await nav(page, "Hoje");
+  await nav(page, "Corrida");
+  await expect(
+    page.getByRole("heading", { name: "Corrida externa de teste" }),
+  ).not.toBeVisible();
+});
+
+test("movimento reduzido mantém as telas visíveis e desativa animações", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await nav(page, "Estudos");
+  await expect(
+    page.getByRole("heading", { name: "O que você quer dominar?" }),
+  ).toBeVisible();
+  expect(
+    await page
+      .locator(".study-explorer")
+      .evaluate((e) => getComputedStyle(e).opacity),
+  ).toBe("1");
+  expect(
+    await page
+      .locator(".nav-indicator")
+      .evaluate((e) => getComputedStyle(e).transitionDuration),
+  ).toBe("0s");
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
 });
