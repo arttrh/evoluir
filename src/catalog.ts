@@ -1,5 +1,5 @@
-import { uid, type Track } from "./model";
-import { springCloudModules } from "./study-content";
+import { uid, type Track } from "./model.js";
+import { springCloudModules } from "./study-content.js";
 type TopicSeed = {
   title: string;
   criteria: string;

@@ -5,9 +5,9 @@ import {
   type ViteDevServer,
 } from "vite";
 import react from "@vitejs/plugin-react";
-import search from "./api/study-search";
-import strava from "./api/strava";
-import type { ApiRequest, ApiResponse } from "./server/http";
+import search from "./api/study-search.js";
+import strava from "./api/strava.js";
+import type { ApiRequest, ApiResponse } from "./server/http.js";
 function localApi(server: ViteDevServer | PreviewServer) {
   server.middlewares.use(async (req, res, next) => {
     const url = new URL(req.url || "/", "http://localhost");

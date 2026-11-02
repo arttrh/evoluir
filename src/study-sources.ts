@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { createTrack } from "./catalog";
-import { roadmapReferences } from "./study-content";
-import { safeUrl, uid, type Track } from "./model";
+import { createTrack } from "./catalog.js";
+import { roadmapReferences } from "./study-content.js";
+import { safeUrl, uid, type Track } from "./model.js";
 export const studySourceSchema = z.object({
   title: z.string().min(1).max(500),
   url: safeUrl,
