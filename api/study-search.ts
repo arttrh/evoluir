@@ -4,6 +4,7 @@ import type {
 } from "../server/http.js";
 import { officialSources, type StudySource } from "../src/study-sources.js";
 import { z } from "zod";
+import { templateFor } from "../src/catalog.js";
 const upstream = z.object({
   items: z.array(
     z.object({
@@ -30,7 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = new URL("https://api.stackexchange.com/2.3/search/advanced");
     url.search = new URLSearchParams({
       site: "stackoverflow",
-      q: query.data,
+      q:
+        templateFor(query.data) === "Go"
+          ? query.data.replace(
+              /\b(golang|golengue|golink|go(?:\s+lang)?)\b/gi,
+              "golang",
+            )
+          : query.data,
       pagesize: "5",
       order: "desc",
       sort: "votes",
@@ -58,12 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     "Cache-Control",
     "public, s-maxage=3600, stale-while-revalidate=86400",
   );
-  return res
-    .status(200)
-    .json({
-      query: query.data,
-      sources,
-      warning,
-      searchedAt: new Date().toISOString(),
-    });
+  return res.status(200).json({
+    query: query.data,
+    sources,
+    warning,
+    searchedAt: new Date().toISOString(),
+  });
 }

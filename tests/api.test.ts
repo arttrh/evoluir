@@ -321,3 +321,29 @@ describe("ciclo OAuth e revogação", () => {
     expect(JSON.stringify(out.body)).not.toContain(token.access_token);
   });
 });
+
+it.each([
+  ["GoLink", "golang"],
+  ["GoLang", "golang"],
+  ["Go interfaces", "golang interfaces"],
+])(
+  "busca de estudos normaliza %s sem perder o foco",
+  async (subject, canonical) => {
+    const fetch = vi.fn(
+      async (_url: URL) => new Response(JSON.stringify({ items: [] })),
+    );
+    vi.stubGlobal("fetch", fetch);
+    const out = response();
+    await search(
+      { method: "GET", query: { q: subject } } as unknown as ApiRequest,
+      out as unknown as ApiResponse,
+    );
+    expect(out.statusCode).toBe(200);
+    expect(new URL(String(fetch.mock.calls[0][0])).searchParams.get("q")).toBe(
+      canonical,
+    );
+    expect((out.body as { sources: unknown[] }).sources.length).toBeGreaterThan(
+      0,
+    );
+  },
+);
