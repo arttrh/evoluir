@@ -112,3 +112,63 @@ it.each([
     );
   },
 );
+
+it.each([
+  "Go",
+  "Golang",
+  "GoLink",
+  "Golengue",
+  "Python",
+  "JavaScript",
+  "TypeScript",
+  "React",
+  "Node.js",
+  "Rust",
+  "C#",
+  "PostgreSQL",
+  "Git",
+  "Linux",
+  "K8s",
+  "Segurança",
+  "AWS",
+])("entrega uma trilha pronta e completa para %s", (subject) => {
+  const track = createTrack(subject, "auto");
+  expect(track.modules.length).toBeGreaterThanOrEqual(3);
+  expect(
+    track.modules.reduce((n, m) => n + m.topics.length, 0),
+  ).toBeGreaterThanOrEqual(6);
+  expect(track.modules[0].title).toContain("Básico");
+  expect(track.modules.at(-1)!.title).toContain("Avançado");
+  expect(roadmapFor(subject)).toBeTruthy();
+  expect(() =>
+    dataSchema.parse({ ...emptyData(), tracks: [track] }),
+  ).not.toThrow();
+  expect(
+    track.modules
+      .flatMap((m) => m.topics)
+      .every(
+        (t) =>
+          t.exercise.length > 30 &&
+          t.criteria.length > 30 &&
+          t.resources.length &&
+          t.resources.every(
+            (r) => r.url.startsWith("https://") && r.why.length > 40,
+          ),
+      ),
+  ).toBe(true);
+});
+it("Go tem prática de módulos, HTTP, testes, concorrência e entrega, com IDs novos a cada criação", () => {
+  const first = createTrack("Go", "auto"),
+    second = createTrack("Golang", "auto");
+  const titles = first.modules
+    .flatMap((m) => m.topics.map((t) => t.title))
+    .join(" ");
+  expect(titles).toMatch(/API HTTP/);
+  expect(titles).toMatch(/Goroutines/);
+  expect(titles).toMatch(/Testes/);
+  expect(titles).toMatch(/Projeto final/);
+  const ids = new Set(first.modules.flatMap((m) => m.topics.map((t) => t.id)));
+  expect(
+    second.modules.flatMap((m) => m.topics).some((t) => ids.has(t.id)),
+  ).toBe(false);
+});

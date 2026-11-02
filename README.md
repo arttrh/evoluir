@@ -1,6 +1,6 @@
-# Evoluir
+# Prumo.
 
-[**Abrir aplicativo**](https://evoluir-hazel.vercel.app)
+[**Abrir Prumo**](https://evoluir-hazel.vercel.app)
 
 Um espaço pessoal para corpo, estudos e carreira. PWA responsivo, com fundo claro, detalhes em bege, vidro translúcido, navegação inferior e animações com GSAP. Sem pontos ou recompensas.
 
@@ -8,11 +8,11 @@ Um espaço pessoal para corpo, estudos e carreira. PWA responsivo, com fundo cla
 
 - Tarefas por área, conclusão, reabertura, planejamento semanal e histórico de reagendamentos.
 - Corridas manuais, ritmo calculado, meta semanal, evolução por semana/mês e resumo mensal.
-- Trilhas editáveis, prática, critérios e revisão. Spring Cloud tem 8 módulos e 20 tópicos. Java, Docker, Backend, System Design e Arquitetura também seguem do básico ao avançado. Trilhas antigas podem ser ampliadas sem perder progresso.
+- Trilhas editáveis, prática, critérios e revisão. Há 20 trilhas prontas: Go, Python, JavaScript, TypeScript, React, Node.js, Rust, C#/.NET, SQL/PostgreSQL, Git, Linux, Kubernetes, Segurança, AWS/Cloud, Java, Docker, Backend, System Design, Arquitetura e Spring Cloud. Go tem seis módulos com prática de HTTP, persistência, testes e concorrência. Trilhas antigas podem ser ampliadas sem perder progresso.
 - Busca de referências: documentação oficial do catálogo primeiro, discussões com respostas aceitas pela API pública do Stack Exchange depois. Roadmap.sh aparece como referência externa, sem cópia ou scraping.
-- Definição de tópicos prioritários para montar uma trilha editável a partir de um assunto. A aplicação não usa IA para inventar uma formação ou avaliar a qualidade de qualquer link na internet.
+- Trilhas próprias prontas, com objetivo, pré-requisitos, sequência, exercícios e critérios. Ajustar os tópicos é opcional. Assuntos fora do catálogo ainda podem ser pesquisados, mas a interface informa quando não existe trilha pronta; não inventa uma formação genérica como se fosse revisada. Não copia conteúdo do roadmap.sh: a licença permite referências por link, não republicação livre.
 - Vagas, candidaturas, contatos e objetivos profissionais.
-- Notícias de Java, Spring e arquitetura via RSS/Atom de Inside Java, Spring Blog, InfoQ e Martin Fowler. Filtros por categoria e manchete, datas e links originais, sem reproduzir artigos. A última leitura fica em sessionStorage para falhas temporárias; não são notificações push.
+- Notícias por assunto: busca online na API documentada do Hacker News/Algolia, com resultados identificados como comunidade, além de RSS/Atom de projetos e fontes técnicas (Go, Python, Java, TypeScript, Kubernetes e segurança). A busca aceita assuntos livres e identifica grafias comuns de Go/Golang. Datas e links originais, sem reproduzir artigos. Cache da última consulta em sessionStorage, sem misturar resultados de assuntos diferentes; não são notificações push.
 - Comandos de voz em português, com transcrição ao vivo, pausas, edição e confirmação. Escuta de até 60 segundos com até três retomadas se o navegador encerrar sozinho. Estudos podem concluir tarefas ou tópicos de trilhas; emprego conclui tarefas; corrida registra distância e duração informadas. Exemplos: “Concluí revisar currículo” e “Corri cinco quilômetros em trinta e cinco minutos”. Há alternativa por texto e pelo ditado do teclado.
 - PWA offline para os dados manuais, fontes locais, exportação e restauração de backup.
 
@@ -62,3 +62,13 @@ Safari → Compartilhar → **Adicionar à Tela de Início**. Abra uma vez com i
 ## Atalhos e movimento no iPhone
 
 [Guia de conexão e atalhos](https://evoluir-hazel.vercel.app/conectar-strava.html). Tocar Atrás aceita dois ou três toques, conforme a Apple. O atalho pode abrir um gravador nativo; o início automático depende das ações que ele disponibiliza. Gravação GPS em segundo plano no Evoluir fica fora desta entrega. As superfícies de vidro ficam paradas durante as transições para evitar recomposição custosa; GSAP anima somente cabeçalhos leves. A fluidez física e o microfone ainda precisam ser conferidos em Safari no aparelho.
+
+## Acesso pessoal e identidade
+
+A marca visível é **prumo.**. Mantivemos o domínio, o ID do PWA e as chaves de armazenamento anteriores para preservar os dados existentes. O repositório pode continuar público; ele não contém os registros pessoais do navegador.
+
+Para acesso pessoal, a proteção nativa da Vercel em **All Deployments** restringe também o endereço principal aos membros autorizados. O plano atual permite essa proteção sem adicionar um serviço de autenticação ou contratar APIs. A Vercel gerencia a duração e reutilização da sessão; o aplicativo não promete um prazo fixo de 90 dias. A sessão do Safari/PWA precisa de validação no aparelho. Conteúdo offline já salvo permanece acessível no aparelho, independentemente da autenticação de rede.
+
+[Documentação oficial de proteção](https://vercel.com/docs/deployment-protection/methods-to-protect-deployments/vercel-authentication).
+
+Os ícones selecionados têm movimentos diferentes com intervalos; clicar novamente reinicia o movimento. As semanas animam os dias e o conteúdo diário. A preferência de movimento reduzido desliga essas animações.

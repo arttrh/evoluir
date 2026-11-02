@@ -228,6 +228,7 @@ function Modal({
 export default function App() {
   const { data, update, restore, error, ready } = useData();
   const [page, setPage] = useState<Page>("Hoje");
+  const [navPulse, setNavPulse] = useState(0);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [formError, setFormError] = useState("");
@@ -240,7 +241,7 @@ export default function App() {
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  usePageMotion(mainRef, page, ready);
+  usePageMotion(mainRef, page, ready, date);
   useEffect(() => {
     const result = new URLSearchParams(location.search).get("strava");
     if (result) {
@@ -361,6 +362,7 @@ export default function App() {
     }));
   }
   function switchPage(value: Page) {
+    setNavPulse(n=>n+1);
     setPage(value);
     window.scrollTo({ top: 0, behavior: "instant" });
     requestAnimationFrame(() =>
@@ -385,14 +387,11 @@ export default function App() {
   );
   const weekStart = monday(date);
   const km = weekKm(data, now);
-  const labels = {
-    Hoje: formatDate(now, { weekday: "long", day: "2-digit", month: "long" }),
-    Corrida: "Corpo · movimento com constância",
-    Estudos: "Aprender · praticar · revisar",
-    Emprego: "Carreira · uma ação por vez",
-    Semana: "Planejar com espaço para a vida",
-    Notícias: "Ler · entender · acompanhar",
-  };
+  const dateLabel = formatDate(now, {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  });
 
   function taskList(tasks: Task[]) {
     return (
@@ -1203,7 +1202,7 @@ export default function App() {
                     onClick={() =>
                       download(
                         JSON.stringify(data, null, 2),
-                        `evoluir-backup-${now}.json`,
+                        `prumo-backup-${now}.json`,
                       )
                     }
                   >
@@ -1274,7 +1273,7 @@ export default function App() {
             );
           } catch {
             setFormError(
-              "Backup inválido. Escolha um arquivo JSON exportado pelo Evoluir, de até 2 MB. Seus dados foram preservados.",
+              "Backup inválido. Escolha um arquivo JSON exportado pelo Prumo, de até 2 MB. Seus dados foram preservados.",
             );
           }
         }}
@@ -1320,9 +1319,9 @@ export default function App() {
           <button
             className="wordmark"
             onClick={() => switchPage("Hoje")}
-            aria-label="Evoluir, início"
+            aria-label="Prumo, início"
           >
-            evoluir<span>.</span>
+            prumo<span>.</span>
           </button>
           <div className="topbar-right">
             <button
@@ -1350,7 +1349,7 @@ export default function App() {
         </header>
         <main id="conteudo" ref={mainRef} tabIndex={-1}>
           <div className="page-heading">
-            <p className="eyebrow">{labels[page]}</p>
+            {page === "Hoje" && <p className="eyebrow">{dateLabel}</p>}
             <h1>
               {page}
               <span className="title-dot">.</span>
@@ -1358,10 +1357,14 @@ export default function App() {
           </div>
           {page === "Hoje" && (
             <>
-              <section className="intro">
-                <h2>Um dia com direção.</h2>
-                <p>{data.settings.dailyFocus}</p>
-              </section>
+              {data.settings.dailyFocus.trim() &&
+                data.settings.dailyFocus !==
+                  "Corpo em movimento. Um passo na carreira." && (
+                  <section className="intro">
+                    <h2>Objetivo do dia</h2>
+                    <p>{data.settings.dailyFocus}</p>
+                  </section>
+                )}
               <div className="dashboard-grid">
                 <div className="stack">
                   <section className="glass next-action">
@@ -1374,7 +1377,7 @@ export default function App() {
                     <h2>{next?.title || "O que importa hoje?"}</h2>
                     <p>
                       {next
-                        ? `${next.minutes} minutos de atenção. Uma coisa de cada vez.`
+                        ? `${next.minutes} min previstos.`
                         : "Escolha uma ação possível para o corpo, os estudos ou a carreira."}
                     </p>
                     <Button
@@ -2314,7 +2317,7 @@ export default function App() {
                 >
                   <ChevronLeft size={20} />
                 </button>
-                <strong>
+                <strong aria-live="polite">
                   {formatDate(weekStart)} — {formatDate(addDays(weekStart, 6))}
                 </strong>
                 <button
@@ -2530,7 +2533,8 @@ export default function App() {
           )}
           {page === "Notícias" && <NewsPage />}
           <footer className="page-footer">
-            Uma coisa de cada vez.<span>evoluir.</span>
+            <span>Dados neste aparelho</span>
+            <span>prumo.</span>
           </footer>
         </main>
       </div>
@@ -2550,10 +2554,17 @@ export default function App() {
           <button
             key={label}
             className={page === label ? "active" : ""}
+            data-nav={label}
             aria-current={page === label ? "page" : undefined}
             onClick={() => switchPage(label)}
           >
-            <Icon size={21} strokeWidth={page === label ? 2 : 1.7} />
+            <span
+              className="nav-glyph"
+              key={page === label ? `${label}-${navPulse}` : label}
+              aria-hidden="true"
+            >
+              <Icon size={21} strokeWidth={page === label ? 2 : 1.7} />
+            </span>
             <span>{label}</span>
           </button>
         ))}

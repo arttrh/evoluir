@@ -203,7 +203,7 @@ export function emptyData(): Data {
     settings: {
       weeklyKm: 15,
       dailyMinutes: 120,
-      dailyFocus: "Corpo em movimento. Um passo na carreira.",
+      dailyFocus: "",
     },
   };
 }

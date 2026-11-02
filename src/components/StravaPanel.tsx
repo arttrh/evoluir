@@ -99,13 +99,13 @@ export function StravaPanel() {
       });
       if (!response.ok)
         throw new Error(
-          "A revogação falhou. Tente novamente ou remova o Evoluir em Strava → Configurações → Meus aplicativos.",
+          "A revogação falhou. Tente novamente ou remova o Prumo em Strava → Configurações → Meus aplicativos.",
         );
       setActivities([]);
       setStatus({ configured: true, connected: false });
       setDisconnecting(false);
       setError(
-        "Conexão revogada. Nenhuma atividade do Strava foi salva no Evoluir.",
+        "Conexão revogada. Nenhuma atividade do Strava foi salva no Prumo.",
       );
     } catch (e) {
       setError(
@@ -151,7 +151,7 @@ export function StravaPanel() {
           </div>
           {disconnecting && (
             <div className="planning-note">
-              <p>Revogar o acesso do Evoluir ao Strava?</p>
+              <p>Revogar o acesso do Prumo ao Strava?</p>
               <button
                 className="text-button"
                 onClick={disconnect}
@@ -247,8 +247,8 @@ export function StravaPanel() {
             <div className="integration-state">
               <span>Conexão automática ainda não ativada</span>
               <p>
-                O acesso depende do cadastro do Evoluir no Strava. Seus
-                registros manuais continuam funcionando.
+                O acesso depende do cadastro do Prumo no Strava. Seus registros
+                manuais continuam funcionando.
               </p>
               <a
                 href="/conectar-strava.html"

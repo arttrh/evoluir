@@ -1,5 +1,11 @@
+import { z } from "zod";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
-import { newsItemSchema, type NewsItem } from "../src/news.js";
+import {
+  newsItemSchema,
+  normalizeNewsQuery,
+  newsSearchTerms,
+  type NewsItem,
+} from "../src/news.js";
 export const newsFeeds = [
   {
     name: "Inside Java",
@@ -21,8 +27,34 @@ export const newsFeeds = [
     url: "https://martinfowler.com/feed.atom",
     category: "Arquitetura",
   },
+  { name: "Go Blog", url: "https://go.dev/blog/feed.atom", category: "Go" },
+  {
+    name: "Python Insider",
+    url: "https://blog.python.org/feeds/posts/default?alt=rss",
+    category: "Python",
+  },
+  {
+    name: "TypeScript Blog",
+    url: "https://devblogs.microsoft.com/typescript/feed/",
+    category: "JavaScript",
+  },
+  {
+    name: "Kubernetes Blog",
+    url: "https://kubernetes.io/feed.xml",
+    category: "Cloud",
+  },
+  {
+    name: "Cisco Talos",
+    url: "https://blog.talosintelligence.com/rss/",
+    category: "Segurança",
+  },
+  {
+    name: "Microsoft Security",
+    url: "https://www.microsoft.com/en-us/security/blog/feed/",
+    category: "Segurança",
+  },
 ] as const;
-type Feed = (typeof newsFeeds)[number];
+type Feed = { name: string; url: string; category: NewsItem["category"] };
 const list = (v: unknown): Record<string, unknown>[] =>
   v == null
     ? []
@@ -38,7 +70,7 @@ const text = (v: unknown): string =>
       : "";
 export function parseNewsFeed(xml: string, feed: Feed): NewsItem[] {
   if (
-    xml.length > 1_000_000 ||
+    xml.length > 2_000_000 ||
     /<!DOCTYPE|<!ENTITY/i.test(xml) ||
     XMLValidator.validate(xml) !== true
   )
@@ -92,8 +124,8 @@ export function parseNewsFeed(xml: string, feed: Feed): NewsItem[] {
   }
   return output;
 }
-async function readBounded(response: Response) {
-  if (Number(response.headers.get("content-length")) > 1_000_000)
+export async function readBounded(response: Response) {
+  if (Number(response.headers.get("content-length")) > 2_000_000)
     throw new Error("Feed muito grande.");
   const reader = response.body?.getReader();
   if (!reader) throw new Error("Feed vazio.");
@@ -104,7 +136,7 @@ async function readBounded(response: Response) {
       const { value, done } = await reader.read();
       if (done) break;
       length += value.length;
-      if (length > 1_000_000) throw new Error("Feed muito grande.");
+      if (length > 2_000_000) throw new Error("Feed muito grande.");
       chunks.push(value);
     }
   } finally {
@@ -118,30 +150,114 @@ async function readBounded(response: Response) {
   }
   return new TextDecoder().decode(body);
 }
-export async function fetchNews() {
-  const result = await Promise.allSettled(
-    newsFeeds.map(async (feed) => {
-      const r = await fetch(feed.url, {
-        redirect: "error",
-        signal: AbortSignal.timeout(6500),
-        headers: {
-          Accept:
-            "application/atom+xml, application/rss+xml, application/xml, text/xml",
-        },
-      });
-      if (!r.ok) throw new Error("Fonte indisponível.");
-      return parseNewsFeed(await readBounded(r), feed);
+
+const hnSchema = z.object({
+  hits: z
+    .array(
+      z.object({
+        title: z.string().nullable(),
+        url: z.string().nullable(),
+        created_at: z.string(),
+        objectID: z.string(),
+      }),
+    )
+    .max(50),
+});
+async function searchHeadlines(query: string): Promise<NewsItem[]> {
+  const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
+  url.search = new URLSearchParams({
+    query: normalizeNewsQuery(query),
+    tags: "story",
+    hitsPerPage: "30",
+    restrictSearchableAttributes: "title,url",
+    numericFilters: "points>2",
+  }).toString();
+  const response = await fetch(url, {
+    redirect: "error",
+    signal: AbortSignal.timeout(6500),
+  });
+  if (!response.ok) throw new Error("Busca indisponível.");
+  const result = hnSchema.parse(JSON.parse(await readBounded(response)));
+  return result.hits.flatMap((hit) => {
+    const parsed = newsItemSchema.safeParse({
+      title: hit.title,
+      url:
+        hit.url ||
+        `https://news.ycombinator.com/item?id=${encodeURIComponent(hit.objectID)}`,
+      source: "Hacker News · comunidade",
+      category: "Tecnologia",
+      publishedAt: hit.created_at,
+    });
+    return parsed.success &&
+      new Date(parsed.data.publishedAt).getTime() <= Date.now() + 86400000
+      ? [parsed.data]
+      : [];
+  });
+}
+function matchesQuery(item: NewsItem, query: string) {
+  const q = normalizeNewsQuery(query);
+  if (!q) return true;
+  const text = normalizeNewsQuery(
+    `${item.title} ${item.source} ${item.category} ${newsSearchTerms[item.category] || ""} ${item.url}`,
+  );
+  if (q === "golang")
+    return item.category === "Go" || /\bgo\b|golang/.test(text);
+  if (q === "security" || q === "seguranca")
+    return (
+      item.category === "Segurança" ||
+      /security|seguranca|vulnerab|cve-/.test(text)
+    );
+  return q.split(/\s+/).every((term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`).test(text);
+  });
+}
+export async function fetchNews(query = "") {
+  const normalized = normalizeNewsQuery(query);
+  const feeds = normalized
+    ? newsFeeds.filter((feed) =>
+        matchesQuery(
+          {
+            title: "",
+            url: feed.url,
+            source: feed.name,
+            category: feed.category,
+            publishedAt: "",
+          },
+          normalized,
+        ),
+      )
+    : newsFeeds;
+  const jobs: { name: string; load: () => Promise<NewsItem[]> }[] = feeds.map(
+    (feed) => ({
+      name: feed.name,
+      load: async () => {
+        const r = await fetch(feed.url, {
+          redirect: "error",
+          signal: AbortSignal.timeout(6500),
+          headers: {
+            Accept:
+              "application/atom+xml, application/rss+xml, application/xml, text/xml",
+          },
+        });
+        if (!r.ok) throw new Error("Fonte indisponível.");
+        return parseNewsFeed(await readBounded(r), feed);
+      },
     }),
   );
+  if (normalized)
+    jobs.push({ name: "Hacker News", load: () => searchHeadlines(normalized) });
+  const result = await Promise.allSettled(jobs.map((job) => job.load()));
   const items: NewsItem[] = [];
   const unavailableSources: string[] = [];
   result.forEach((r, i) => {
-    if (r.status === "fulfilled" && r.value.length) items.push(...r.value);
-    else unavailableSources.push(newsFeeds[i].name);
+    if (r.status === "fulfilled") items.push(...r.value);
+    else unavailableSources.push(jobs[i].name);
   });
   const urls = new Set<string>();
   return {
     items: items
+      .filter((i) => matchesQuery(i, normalized))
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
       .filter((item) => {
         if (urls.has(item.url)) return false;

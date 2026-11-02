@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/news", (route) =>
+  await page.route("**/api/news*", (route) =>
     route.fulfill({
       json: {
         items: [],
@@ -154,7 +154,7 @@ test("exporta backup e recusa importação inválida preservando dados", async (
   await page.getByLabel("Preferências e backup").click();
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar backup" }).click();
-  expect((await downloading).suggestedFilename()).toContain("evoluir-backup-");
+  expect((await downloading).suggestedFilename()).toContain("prumo-backup-");
   await page.getByLabel("Arquivo de backup").setInputFiles({
     name: "invalido.json",
     mimeType: "application/json",
@@ -414,7 +414,7 @@ test("voz só altera uma tarefa depois da confirmação", async ({ page }) => {
 test("voz registra corrida e conclui treino somente quando vinculado", async ({
   page,
 }) => {
-  await page.setViewportSize({width:320,height:568});
+  await page.setViewportSize({ width: 320, height: 568 });
   await addTask(page, "Correr 5 km", "corpo");
   await page
     .getByRole("button", { name: "Comando de voz", exact: true })
@@ -428,7 +428,9 @@ test("voz registra corrida e conclui treino somente quando vinculado", async ({
   await page
     .getByLabel("Concluir também um treino?")
     .selectOption({ label: "Correr 5 km" });
-  await expect(page.getByRole("button", { name: "Confirmar corrida", exact: true })).toBeInViewport();
+  await expect(
+    page.getByRole("button", { name: "Confirmar corrida", exact: true }),
+  ).toBeInViewport();
   await page
     .getByRole("button", { name: "Confirmar corrida", exact: true })
     .click();
@@ -500,6 +502,7 @@ test("busca fontes reais pelo endpoint e monta trilha com tópicos escolhidos", 
   await expect(
     page.getByRole("link", { name: /Spring Cloud Gateway/ }),
   ).toBeVisible();
+  await page.getByText("Personalizar foco (opcional)", { exact: true }).click();
   await page
     .getByLabel("Quais tópicos você quer priorizar? (opcional)")
     .fill("Eureka, Gateway");
@@ -751,38 +754,48 @@ test("corrige uma transcrição incorreta e confirma tópico de uma trilha", asy
   expect(topic.reviewDate).toBeTruthy();
 });
 
-test("notícias filtra manchetes reais do endpoint e mantém última leitura na falha", async ({
+test("notícias pesquisa no servidor, filtra por assunto e recupera leitura na falha", async ({
   page,
 }) => {
-  await page.route("**/api/news", (route) =>
-    route.fulfill({
+  const all = [
+    {
+      title: "Novidades do Java",
+      url: "https://inside.java/test",
+      source: "Inside Java",
+      category: "Java",
+      publishedAt: "2026-11-02T10:00:00Z",
+    },
+    {
+      title: "Arquitetura de sistemas",
+      url: "https://martinfowler.com/test",
+      source: "Martin Fowler",
+      category: "Arquitetura",
+      publishedAt: "2026-11-01T10:00:00Z",
+    },
+  ];
+  const queries: string[] = [];
+  await page.route("**/api/news*", (route) => {
+    const q = new URL(route.request().url()).searchParams.get("q") || "";
+    queries.push(q);
+    return route.fulfill({
       json: {
-        items: [
-          {
-            title: "Novidades do Java",
-            url: "https://inside.java/test",
-            source: "Inside Java",
-            category: "Java",
-            publishedAt: "2026-11-02T10:00:00Z",
-          },
-          {
-            title: "Arquitetura de sistemas",
-            url: "https://martinfowler.com/test",
-            source: "Martin Fowler",
-            category: "Arquitetura",
-            publishedAt: "2026-11-01T10:00:00Z",
-          },
-        ],
+        items: q === "inexistente" ? [] : q === "architecture" ? [all[1]] : all,
         updatedAt: "2026-11-02T12:00:00Z",
         unavailableSources: [],
       },
-    }),
-  );
+    });
+  });
   await nav(page, "Notícias");
   await expect(
     page.getByRole("link", { name: "Novidades do Java", exact: true }),
-  ).toHaveAttribute("href", "https://inside.java/test");
-  expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
+  ).toBeVisible();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
   await page.getByRole("button", { name: "Arquitetura", exact: true }).click();
   await expect(
     page.getByRole("link", { name: "Novidades do Java", exact: true }),
@@ -790,10 +803,16 @@ test("notícias filtra manchetes reais do endpoint e mantém última leitura na 
   await expect(
     page.getByRole("link", { name: "Arquitetura de sistemas", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Filtrar notícias").fill("inexistente");
-  await expect(page.getByText("Nenhuma manchete neste filtro")).toBeVisible();
-  await page.getByLabel("Filtrar notícias").fill("");
-  await page.route("**/api/news", (route) => route.abort());
+  expect(queries).toContain("architecture");
+  await page.getByLabel("Buscar notícias").fill("inexistente");
+  await expect(
+    page.getByText("Nenhuma notícia para este assunto"),
+  ).toBeVisible();
+  await page.getByLabel("Buscar notícias").fill("");
+  await expect(
+    page.getByRole("link", { name: "Novidades do Java", exact: true }),
+  ).toBeVisible();
+  await page.route("**/api/news*", (route) => route.abort());
   await page
     .getByRole("button", { name: "Atualizar notícias", exact: true })
     .click();
@@ -839,4 +858,134 @@ test("animação da home mantém superfícies de vidro sem transformação", asy
   await expect(
     page.getByRole("heading", { name: "Hoje.", exact: true }),
   ).toBeVisible();
+});
+
+test("Go gera uma trilha pronta sem preencher módulos nem tópicos", async ({
+  page,
+}) => {
+  await page.route("**/api/study-search?*", (route) => route.abort());
+  await nav(page, "Estudos");
+  await page.getByLabel("Assunto para pesquisar").fill("GoLang");
+  await page
+    .getByRole("button", { name: "Buscar fontes", exact: true })
+    .click();
+  await expect(page.getByText("Trilha pronta", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("6 módulos · 12 tópicos", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Criar trilha deste assunto", exact: true })
+    .click();
+  const track = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("evoluir.data.v1")!).tracks[0],
+  );
+  expect(track.modules).toHaveLength(6);
+  expect(
+    track.modules
+      .flatMap((m: any) => m.topics)
+      .every(
+        (t: any) =>
+          t.resources.length &&
+          t.criteria.length > 30 &&
+          t.exercise.length > 30,
+      ),
+  ).toBe(true);
+});
+test("busca de notícias Go não depende de manchetes Java já carregadas", async ({
+  page,
+}) => {
+  let requested = "";
+  await page.route("**/api/news*", (route) => {
+    const q = new URL(route.request().url()).searchParams.get("q") || "";
+    requested = q;
+    return route.fulfill({
+      json: {
+        items: q
+          ? [
+              {
+                title: "Go: novidades da linguagem",
+                url: "https://go.dev/blog/test",
+                source: "Go Blog",
+                category: "Go",
+                publishedAt: "2026-11-01T10:00:00Z",
+              },
+            ]
+          : [],
+        updatedAt: "2026-11-02T12:00:00Z",
+        unavailableSources: [],
+      },
+    });
+  });
+  await nav(page, "Notícias");
+  await page.getByLabel("Buscar notícias").fill("Golang");
+  await expect(
+    page.getByRole("link", { name: "Go: novidades da linguagem", exact: true }),
+  ).toBeVisible();
+  expect(requested).toBe("Golang");
+});
+test("cada ícone tem movimento próprio e redução de movimento interrompe todas as animações", async ({
+  page,
+}) => {
+  const names = new Set<string>();
+  for (const label of [
+    "Hoje",
+    "Corrida",
+    "Estudos",
+    "Emprego",
+    "Semana",
+    "Notícias",
+  ]) {
+    await nav(page, label);
+    const animations = await page
+      .getByRole("navigation")
+      .getByRole("button", { name: label, exact: true })
+      .locator(".nav-glyph")
+      .evaluate((el) =>
+        el
+          .getAnimations({ subtree: true })
+          .map((a) => (a as CSSAnimation).animationName),
+      );
+    expect(animations.length).toBeGreaterThan(0);
+    names.add(animations[0]);
+  }
+  expect(names.size).toBe(6);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page
+      .locator("nav .nav-glyph")
+      .evaluateAll(
+        (nodes) =>
+          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
+      ),
+  ).toBe(0);
+});
+test("trocar semanas anima dias, muda as datas e preserva as tarefas", async ({
+  page,
+}) => {
+  await addTask(page, "Tarefa preservada");
+  await nav(page, "Semana");
+  const before = await page.locator(".week-days").innerText();
+  await page
+    .getByRole("button", { name: "Próxima semana", exact: true })
+    .click();
+  await expect
+    .poll(() => page.locator(".week-days").innerText())
+    .not.toBe(before);
+  await page.waitForTimeout(30);
+  expect(
+    await page
+      .locator(".week-days button")
+      .evaluateAll((nodes) =>
+        nodes.some((n) => getComputedStyle(n).transform !== "none"),
+      ),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "Semana anterior", exact: true })
+    .click();
+  await expect(
+    page.getByText("Tarefa preservada", { exact: true }),
+  ).toBeVisible();
+});
+test('a página inicial mostra objetivos escritos pelo usuário e não apaga dados antigos ao trocar a marca',async({page})=>{
+ await addTask(page,'Preservar meu planejamento');const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('evoluir.data.v1')!));before.settings.dailyFocus='Praticar Go e revisar a candidatura';await page.evaluate(d=>localStorage.setItem('evoluir.data.v1',JSON.stringify(d)),before);await page.reload();await expect(page.getByText('Praticar Go e revisar a candidatura',{exact:true})).toBeVisible();await expect(page.getByText('Preservar meu planejamento',{exact:true}).last()).toBeVisible();await expect(page.getByRole('button',{name:'Prumo, início',exact:true})).toBeVisible();
 });

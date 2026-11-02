@@ -204,7 +204,10 @@ describe("objetivo de estudo", () => {
     );
   });
   it("não confunde JavaScript com Java e mantém tema desconhecido manual", () => {
-    expect(createTrack("Aprender JavaScript", "auto").modules[0].title).toBe(
+    expect(
+      createTrack("Aprender JavaScript", "auto").modules[0].topics[0].title,
+    ).toContain("Tipos, funções");
+    expect(createTrack("Aprender Elixir", "auto").modules[0].title).toBe(
       "Primeiro módulo",
     );
   });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Search,
   ArrowUpRight,
@@ -14,8 +14,14 @@ import {
   topicModule,
   type StudySource,
 } from "../study-sources";
-import { createTrack, expandTrack, hasExpansion } from "../catalog";
-import { uid, type Data, type Track } from "../model";
+import {
+  createTrack,
+  expandTrack,
+  hasExpansion,
+  templateFor,
+  templateNames,
+} from "../catalog";
+import { type Data, type Track } from "../model";
 import { z } from "zod";
 export function StudyExplorer({
   track,
@@ -32,8 +38,16 @@ export function StudyExplorer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState("");
+  const preview = useMemo(
+    () =>
+      searched && templateFor(searched) !== "manual"
+        ? createTrack(searched, "auto")
+        : null,
+    [searched],
+  );
   async function searchFor(value: string) {
     setQuery(value);
+    setTopics("");
     setBusy(true);
     setError("");
     setSources([]);
@@ -61,6 +75,7 @@ export function StudyExplorer({
     }
   }
   function build() {
+    if (!preview) return;
     const title = searched;
     const base = createTrack(title, "auto");
     const requested = topics
@@ -99,7 +114,6 @@ export function StudyExplorer({
     <section className="study-explorer glass">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Um caminho com contexto</span>
           <h2>O que você quer dominar?</h2>
         </div>
         <span className="explorer-icon">
@@ -107,8 +121,8 @@ export function StudyExplorer({
         </span>
       </div>
       <p className="muted small">
-        Busque um assunto e escolha o foco. Documentação primeiro, prática
-        depois, revisão para consolidar.
+        Escolha um assunto. Receba uma trilha pronta, do básico ao avançado, com
+        prática e fontes em cada etapa.
       </p>
       <form
         className="study-search"
@@ -127,7 +141,8 @@ export function StudyExplorer({
           required
           minLength={2}
           maxLength={120}
-          placeholder="Spring Cloud, Docker, Java…"
+          placeholder="Go, Python, React, segurança…"
+          list="study-subjects"
         />
         <button className="button" disabled={busy} type="submit">
           {busy ? (
@@ -138,23 +153,24 @@ export function StudyExplorer({
           <span>{busy ? "Buscando" : "Buscar fontes"}</span>
         </button>
       </form>
-      <div className="study-suggestions" aria-label="Sugestões de estudo">
-        {[
-          "Java",
-          "System Design",
-          "Arquiteturas de projetos",
-          "Backend",
-          "Docker",
-        ].map((subject) => (
-          <button
-            key={subject}
-            className="chip"
-            disabled={busy}
-            onClick={() => void searchFor(subject)}
-          >
-            {subject}
-          </button>
+      <datalist id="study-subjects">
+        {templateNames.map((name) => (
+          <option key={name} value={name} />
         ))}
+      </datalist>
+      <div className="study-suggestions" aria-label="Sugestões de estudo">
+        {["Go", "Python", "JavaScript", "Segurança", "System Design"].map(
+          (subject) => (
+            <button
+              key={subject}
+              className="chip"
+              disabled={busy}
+              onClick={() => void searchFor(subject)}
+            >
+              {subject}
+            </button>
+          ),
+        )}
       </div>
       {error && (
         <p className="planning-note" role="status">
@@ -163,6 +179,37 @@ export function StudyExplorer({
       )}
       {searched && (
         <div className="search-results">
+          {preview ? (
+            <div className="track-outline">
+              <div>
+                <span className="eyebrow">Trilha pronta</span>
+                <h3>
+                  {preview.modules.length} módulos ·{" "}
+                  {preview.modules.reduce((n, m) => n + m.topics.length, 0)}{" "}
+                  tópicos
+                </h3>
+              </div>
+              <p>{preview.objective}</p>
+              <button className="button" onClick={build}>
+                <Plus size={17} />
+                Criar trilha deste assunto
+              </button>
+              <ol>
+                {preview.modules.map((m) => (
+                  <li key={m.id}>
+                    {m.title}
+                    <small>{m.topics.length} tópicos</small>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : (
+            <p className="planning-note" role="status">
+              Este assunto ainda não tem uma trilha pronta revisada. As fontes
+              abaixo ajudam na pesquisa. Experimente um dos{" "}
+              {templateNames.length} assuntos do catálogo.
+            </p>
+          )}
           <div className="section-heading">
             <h3>Fontes para {searched}</h3>
             <span>{sources.length} referências</span>
@@ -195,23 +242,24 @@ export function StudyExplorer({
               referências na trilha.
             </p>
           )}
-          <label className="field">
-            <span>Quais tópicos você quer priorizar? (opcional)</span>
-            <textarea
-              value={topics}
-              onChange={(e) => setTopics(e.target.value)}
-              maxLength={1200}
-              placeholder="Ex.: Eureka, Gateway, Circuit Breaker"
-            />
-            <small>
-              Até 12 tópicos, separados por vírgula. As referências oficiais do
-              assunto acompanham os módulos para você revisar e ajustar.
-            </small>
-          </label>
-          <button className="button" onClick={build}>
-            <Plus size={17} />
-            Criar trilha deste assunto
-          </button>
+          {preview && (
+            <details className="help">
+              <summary>Personalizar foco (opcional)</summary>
+              <label className="field">
+                <span>Quais tópicos você quer priorizar? (opcional)</span>
+                <textarea
+                  value={topics}
+                  onChange={(e) => setTopics(e.target.value)}
+                  maxLength={1200}
+                  placeholder="Ex.: Eureka, Gateway, Circuit Breaker"
+                />
+                <small>
+                  Até 12 tópicos, separados por vírgula. As referências oficiais
+                  do assunto acompanham os módulos para você revisar e ajustar.
+                </small>
+              </label>
+            </details>
+          )}
         </div>
       )}
       {roadmap && (

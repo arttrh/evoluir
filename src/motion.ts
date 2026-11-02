@@ -4,6 +4,7 @@ export function usePageMotion(
   ref: RefObject<HTMLElement | null>,
   page: string,
   ready: boolean,
+  date: string,
 ) {
   useLayoutEffect(() => {
     const main = ref.current;
@@ -29,9 +30,37 @@ export function usePageMotion(
             clearProps: "transform",
           },
         );
+        if (page === "Semana") {
+          gsap.fromTo(
+            main.querySelectorAll(".week-days > button"),
+            { y: 7, scale: 0.96 },
+            {
+              y: 0,
+              scale: 1,
+              duration: 0.3,
+              stagger: 0.025,
+              ease: "power2.out",
+              clearProps: "transform",
+            },
+          );
+          const content = main.querySelector(
+            ".week-days + .two-column > .stack > section",
+          );
+          if (content)
+            gsap.fromTo(
+              content,
+              { x: 12 },
+              {
+                x: 0,
+                duration: 0.3,
+                ease: "power2.out",
+                clearProps: "transform",
+              },
+            );
+        }
       }, main);
       return () => context.revert();
     });
     return () => media.revert();
-  }, [ref, page, ready]);
+  }, [ref, page, ready, date]);
 }

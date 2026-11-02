@@ -1,5 +1,5 @@
 import type { Track } from "./model.js";
-type Seed = {
+export type Seed = {
   objective: string;
   prerequisites: string;
   modules: {

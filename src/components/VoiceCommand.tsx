@@ -473,7 +473,7 @@ export function VoiceCommand({
           “Terminei de estudar Java”, “Enviei as candidaturas”, “Concluí o
           tópico Service Discovery”, “Corri cinco quilômetros em trinta e cinco
           minutos”. Uma ação por vez. O serviço do navegador pode processar
-          áudio online; o Evoluir não grava áudio nem escuta em segundo plano.
+          áudio online; o Prumo não grava áudio nem escuta em segundo plano.
         </p>
       </details>
     </div>

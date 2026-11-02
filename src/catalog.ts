@@ -1,8 +1,10 @@
 import { uid, type Track } from "./model.js";
 import { springCloudModules } from "./study-content.js";
 import { advancedTracks } from "./advanced-content.js";
+import { readyTracks } from "./ready-content.js";
 const seeds: typeof advancedTracks = {
   ...advancedTracks,
+  ...readyTracks,
   "Spring Cloud": {
     objective:
       "Construir um pequeno sistema de serviços com descoberta, gateway e resiliência.",
@@ -16,23 +18,40 @@ export function templateFor(title: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  return /system[\s-]*design|projeto de sistemas|sistemas distribuidos/.test(
-    subject,
-  )
-    ? "System Design"
-    : /arquitetura|software architect|clean architecture|hexagonal/.test(
-          subject,
-        )
-      ? "Arquitetura de software"
-      : /spring[\s-]*cloud/.test(subject)
-        ? "Spring Cloud"
-        : /\bdocker\b/.test(subject)
-          ? "Docker"
-          : /\bjava\b/.test(subject)
-            ? "Java"
-            : /back[\s-]*end/.test(subject)
-              ? "Backend"
-              : "manual";
+  const match = [
+    ["Go", /\b(go|golang|golengue|golink)\b|go lang/],
+    ["Python", /\bpython\b/],
+    ["React", /\breact\b/],
+    ["Node.js", /\bnode(?:\.js|js)?\b/],
+    ["TypeScript", /\btypescript\b/],
+    ["JavaScript", /\bjavascript\b/],
+    ["Rust", /\brust\b/],
+    ["C# / .NET", /c#|c sharp|csharp|\.net|dotnet/],
+    ["SQL / PostgreSQL", /\b(sql|postgresql|postgres|mysql)\b/],
+    ["Git", /\bgit\b/],
+    ["Linux", /\blinux\b/],
+    ["Kubernetes", /\b(kubernetes|k8s)\b/],
+    [
+      "Segurança de aplicações",
+      /seguranca|security|owasp|appsec|ciberseguranca/,
+    ],
+    ["AWS / Cloud", /\b(aws|cloud|nuvem)\b/],
+    [
+      "System Design",
+      /system[\s-]*design|projeto de sistemas|sistemas distribuidos/,
+    ],
+    [
+      "Arquitetura de software",
+      /arquitetura|software architect|clean architecture|hexagonal/,
+    ],
+    ["Spring Cloud", /spring[\s-]*cloud/],
+    ["Docker", /\bdocker\b/],
+    ["Java", /\bjava\b/],
+    ["Backend", /back[\s-]*end/],
+  ] as const;
+  // Spring Cloud tem prioridade sobre a expressão genérica de nuvem.
+  if (/spring[\s-]*cloud/.test(subject)) return "Spring Cloud";
+  return match.find(([, pattern]) => pattern.test(subject))?.[0] || "manual";
 }
 
 export const templateNames = Object.keys(seeds);
