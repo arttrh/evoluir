@@ -12,25 +12,23 @@ export function usePageMotion(
       const context = gsap.context(() => {
         gsap.fromTo(
           ".page-heading",
-          { y: 14, opacity: 0 },
+          { y: 14 },
           {
             y: 0,
-            opacity: 1,
             duration: 0.55,
             ease: "power3.out",
-            clearProps: "transform,opacity",
+            clearProps: "transform",
           },
         );
         gsap.fromTo(
           ".intro, .stack > section, .daily-overview, .two-column > section, .track-selector, .study-explorer, .week-days",
-          { y: 22, opacity: 0 },
+          { y: 22 },
           {
             y: 0,
-            opacity: 1,
             duration: 0.65,
             stagger: 0.07,
             ease: "power3.out",
-            clearProps: "transform,opacity",
+            clearProps: "transform",
           },
         );
       }, ref);
