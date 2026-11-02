@@ -53,3 +53,15 @@ O contêiner executa com usuário sem privilégios. A hospedagem deve fornecer H
 O servidor Java responde com `private, no-store`, inclusive para pesquisas públicas, evitando que um cache intermediário devolva respostas protegidas sem verificar a chave. Chamadas às fontes têm tempo limite, tamanho máximo e destinos fixos. RSS/Atom rejeita DTD, entidades externas e XML profundamente aninhado. Nenhum token Strava aparece no JSON do frontend.
 
 Os testes usam respostas simuladas das fontes para cobrir limites, falhas, OAuth, cookies antigos e ausência de vazamento. Não substituem a validação com a conta Strava real após configurar a hospedagem.
+
+## Render
+
+O `render.yaml` na raiz prepara um único Web Service Docker no plano **Free**, sem banco e sem assinatura Strava. Ele usa `backend/Dockerfile`, respeita `PORT` e gera `BACKEND_API_KEY` no próprio Render. O serviço exige essa chave mesmo quando seu endereço é público. Não configure verificação HTTP em `/api/health` sem autenticação; a verificação TCP padrão é adequada.
+
+Na conta Render, crie um Blueprint a partir deste repositório e confira que o plano selecionado é Free. Depois do deploy, configure na Vercel `JAVA_BACKEND_URL` com o endereço HTTPS `onrender.com` criado e `JAVA_BACKEND_KEY` com a chave gerada pelo Render. Guarde esse valor apenas nas configurações privadas dos dois serviços. A implantação na conta ainda depende de autenticação no Render.
+
+O plano gratuito suspende o serviço após 15 minutos sem tráfego. O primeiro acesso pode levar cerca de um minuto para acordá-lo; o proxy tem limite de 15 segundos e pode retornar erro nessa primeira tentativa. Aguarde e tente novamente. A interface e os registros locais continuam disponíveis. Não foi adicionado mecanismo para manter artificialmente o serviço acordado.
+
+A integração Strava é opcional. A documentação atual exige assinatura para criar uma aplicação de API; deixe suas variáveis Strava ausentes se não quiser contratar. Corridas manuais continuam funcionando.
+
+Referências: [Docker no Render](https://render.com/docs/docker), [limites do Free](https://render.com/docs/free), [requisitos Strava](https://developers.strava.com/docs/getting-started/).

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: prumo-api
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    envVars:
+      - key: BACKEND_API_KEY
+        generateValue: true
+      - key: APP_ORIGIN
+        value: https://evoluir-hazel.vercel.app

@@ -247,8 +247,9 @@ export function StravaPanel() {
             <div className="integration-state">
               <span>Conexão automática ainda não ativada</span>
               <p>
-                O acesso depende do cadastro do Prumo no Strava. Seus registros
-                manuais continuam funcionando.
+                A criação do aplicativo de API exige assinatura Strava. Essa
+                conexão é opcional; seus registros manuais continuam funcionando
+                sem contratar um plano.
               </p>
               <a
                 href="/conectar-strava.html"
