@@ -8,12 +8,13 @@ import react from "@vitejs/plugin-react";
 import search from "./api/study-search.js";
 import strava from "./api/strava.js";
 import news from "./api/news.js";
+import jobs from "./api/jobs.js";
 import type { ApiRequest, ApiResponse } from "./server/http.js";
 function localApi(server: ViteDevServer | PreviewServer) {
   server.middlewares.use(async (req, res, next) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (
-      !["/api/study-search", "/api/strava", "/api/news"].includes(url.pathname)
+      !["/api/study-search", "/api/strava", "/api/news", "/api/jobs"].includes(url.pathname)
     )
       return next();
     const request = req as ApiRequest;
@@ -36,7 +37,9 @@ function localApi(server: ViteDevServer | PreviewServer) {
     };
     try {
       await (
-        url.pathname === "/api/strava"
+        url.pathname === "/api/jobs"
+          ? jobs
+          : url.pathname === "/api/strava"
           ? strava
           : url.pathname === "/api/news"
             ? news

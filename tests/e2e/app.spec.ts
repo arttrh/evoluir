@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/jobs*", route => route.fulfill({ json: {items: [], total: 0, incomplete: false, updatedAt: new Date().toISOString()} }));
   await page.route("**/api/news*", (route) =>
     route.fulfill({
       json: {

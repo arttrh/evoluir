@@ -94,6 +94,7 @@ export const jobSchema = z
     url: safeUrl.or(z.literal("")),
     date: dateSchema,
     status: z.enum(jobStatuses),
+    appliedAt: timestamp.nullable().optional(),
     contact: z.string().max(500),
     notes,
   })
@@ -175,6 +176,20 @@ export type Task = z.infer<typeof taskSchema>;
 export type Run = z.infer<typeof runSchema>;
 export type Track = z.infer<typeof trackSchema>;
 export type Job = z.infer<typeof jobSchema>;
+export function changeJobStatus(
+  job: Job,
+  status: Job["status"],
+  at = new Date().toISOString(),
+): Job {
+  return jobSchema.parse({
+    ...job,
+    status,
+    appliedAt:
+      status === "Encontrada"
+        ? null
+        : job.appliedAt || (status === "Candidatura enviada" ? at : null),
+  });
+}
 export type Goal = Data["goals"][number];
 export type Area = (typeof areas)[number];
 export function uid() {

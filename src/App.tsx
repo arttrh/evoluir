@@ -1,3 +1,4 @@
+import { JobSearch } from "./components/JobSearch";
 import { AnimatedIcon } from "./components/AnimatedIcon";
 import { LessonGuide } from "./components/LessonGuide";
 import { NewsPage } from "./components/NewsPage";
@@ -45,6 +46,7 @@ import {
 } from "lucide-react";
 import {
   saveRun,
+  changeJobStatus,
   addDays,
   areas,
   dataSchema,
@@ -97,6 +99,7 @@ type Editor = {
   taskId?: string;
   message?: string;
   action?: () => void;
+  jobDraft?: Partial<Job>;
 };
 const number = (n: number) =>
   new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(n);
@@ -584,11 +587,27 @@ export default function App() {
             contact: s("contact"),
             notes: s("notes"),
           };
+          if (
+            job.url &&
+            d.jobs.some(
+              (saved) => saved.id !== old?.id && saved.url === job.url,
+            )
+          )
+            throw new Error(
+              "Esta vaga já está no seu painel. Edite o registro existente.",
+            );
           return {
             ...d,
             jobs: old
-              ? d.jobs.map((j) => (j.id === old.id ? job : j))
-              : [...d.jobs, job],
+              ? d.jobs.map((j) =>
+                  j.id === old.id
+                    ? changeJobStatus(
+                        { ...job, appliedAt: old.appliedAt },
+                        job.status,
+                      )
+                    : j,
+                )
+              : [...d.jobs, changeJobStatus(job, job.status)],
           };
         }
         if (editor.kind === "goal") {
@@ -724,7 +743,7 @@ export default function App() {
     if (!editor) return null;
     const task = data.tasks.find((t) => t.id === editor.id);
     const run = data.runs.find((r) => r.id === editor.id);
-    const job = data.jobs.find((j) => j.id === editor.id);
+    const job = data.jobs.find((j) => j.id === editor.id) || editor.jobDraft;
     const goal = data.goals.find((g) => g.id === editor.id);
     const track = data.tracks.find(
       (t) => t.id === (editor.trackId || editor.id),
@@ -2168,6 +2187,19 @@ export default function App() {
           )}
           {page === "Emprego" && (
             <>
+              <JobSearch
+                jobs={data.jobs}
+                onSave={(vacancy) =>
+                  open({
+                    kind: "job",
+                    jobDraft: {
+                      role: vacancy.title,
+                      url: vacancy.url,
+                      notes: `Fonte: ${vacancy.source}. Publicada em ${formatDate(vacancy.publishedAt.slice(0, 10))}. Confira a empresa e as instruções no anúncio original.`,
+                    },
+                  })
+                }
+              />
               <div className="two-column">
                 <div className="stack">
                   <section className="glass">
@@ -2270,6 +2302,14 @@ export default function App() {
                             <p className="small muted">
                               Registrada em {formatDate(j.date)}
                             </p>
+                            {j.appliedAt && (
+                              <p className="small muted">
+                                Envio confirmado em{" "}
+                                {new Date(j.appliedAt).toLocaleDateString(
+                                  "pt-BR",
+                                )}
+                              </p>
+                            )}
                             {j.contact && (
                               <p className="small">Contato: {j.contact}</p>
                             )}
@@ -2291,11 +2331,10 @@ export default function App() {
                                     ...d,
                                     jobs: d.jobs.map((job) =>
                                       job.id === j.id
-                                        ? {
-                                            ...job,
-                                            status: e.target
-                                              .value as Job["status"],
-                                          }
+                                        ? changeJobStatus(
+                                            job,
+                                            e.target.value as Job["status"],
+                                          )
                                         : job,
                                     ),
                                   }))
@@ -2317,6 +2356,30 @@ export default function App() {
                                 </a>
                               )}
                             </div>
+                            {j.status === "Encontrada" && (
+                              <button
+                                className="text-button"
+                                onClick={() =>
+                                  confirm(
+                                    "Você já concluiu o envio do currículo pelo canal indicado na vaga? Confirme apenas depois de enviar. Esta ação registra o envio no painel.",
+                                    () =>
+                                      update((d) => ({
+                                        ...d,
+                                        jobs: d.jobs.map((job) =>
+                                          job.id === j.id
+                                            ? changeJobStatus(
+                                                job,
+                                                "Candidatura enviada",
+                                              )
+                                            : job,
+                                        ),
+                                      })),
+                                  )
+                                }
+                              >
+                                Confirmar currículo enviado
+                              </button>
+                            )}
                           </article>
                         ))}
                     </div>
