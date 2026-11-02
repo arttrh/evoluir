@@ -2401,3 +2401,23 @@ dialog[open] {
 .track-outline > .button {
   margin-bottom: 18px;
 }
+
+.motion-preference {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin: 12px 0 20px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.motion-preference input {
+  width: 20px;
+  height: 20px;
+  accent-color: #2b2924;
+}
+.bottom-nav[data-icon-motion="off"] .nav-glyph,
+.bottom-nav[data-icon-motion="off"] .nav-glyph svg path {
+  animation: none !important;
+  transform: none !important;
+}

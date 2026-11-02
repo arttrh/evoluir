@@ -71,4 +71,4 @@ Para acesso pessoal, a proteção nativa da Vercel em **All Deployments** restri
 
 [Documentação oficial de proteção](https://vercel.com/docs/deployment-protection/methods-to-protect-deployments/vercel-authentication).
 
-Os ícones selecionados têm movimentos diferentes com intervalos; clicar novamente reinicia o movimento. As semanas animam os dias e o conteúdo diário. A preferência de movimento reduzido desliga essas animações.
+Os ícones selecionados têm movimentos diferentes com intervalos; clicar novamente reinicia o movimento. As semanas animam os dias e o conteúdo diário. A preferência de movimento reduzido desliga essas animações. Em Preferências também é possível pausar os ícones; a escolha fica neste navegador, separada do backup de registros.

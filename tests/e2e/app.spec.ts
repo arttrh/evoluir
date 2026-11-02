@@ -986,6 +986,67 @@ test("trocar semanas anima dias, muda as datas e preserva as tarefas", async ({
     page.getByText("Tarefa preservada", { exact: true }),
   ).toBeVisible();
 });
-test('a página inicial mostra objetivos escritos pelo usuário e não apaga dados antigos ao trocar a marca',async({page})=>{
- await addTask(page,'Preservar meu planejamento');const before=await page.evaluate(()=>JSON.parse(localStorage.getItem('evoluir.data.v1')!));before.settings.dailyFocus='Praticar Go e revisar a candidatura';await page.evaluate(d=>localStorage.setItem('evoluir.data.v1',JSON.stringify(d)),before);await page.reload();await expect(page.getByText('Praticar Go e revisar a candidatura',{exact:true})).toBeVisible();await expect(page.getByText('Preservar meu planejamento',{exact:true}).last()).toBeVisible();await expect(page.getByRole('button',{name:'Prumo, início',exact:true})).toBeVisible();
+test("a página inicial mostra objetivos escritos pelo usuário e não apaga dados antigos ao trocar a marca", async ({
+  page,
+}) => {
+  await addTask(page, "Preservar meu planejamento");
+  const before = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!),
+  );
+  before.settings.dailyFocus = "Praticar Go e revisar a candidatura";
+  await page.evaluate(
+    (d) => localStorage.setItem("evoluir.data.v1", JSON.stringify(d)),
+    before,
+  );
+  await page.reload();
+  await expect(
+    page.getByText("Praticar Go e revisar a candidatura", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Preservar meu planejamento", { exact: true }).last(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Prumo, início", exact: true }),
+  ).toBeVisible();
+});
+
+test("pausa o movimento dos ícones nas preferências e preserva a escolha após reabrir", async ({
+  page,
+}) => {
+  await page.getByLabel("Preferências e backup").click();
+  const toggle = page.getByRole("checkbox", {
+    name: "Animar ícones da navegação",
+    exact: true,
+  });
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.keyboard.press("Escape");
+  expect(
+    await page
+      .locator("nav .nav-glyph")
+      .evaluateAll(
+        (nodes) =>
+          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
+      ),
+  ).toBe(0);
+  await page.reload();
+  await page.getByLabel("Preferências e backup").click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await page.keyboard.press("Escape");
+  expect(
+    await page
+      .locator("nav .nav-glyph")
+      .evaluateAll(
+        (nodes) =>
+          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
+      ),
+  ).toBeGreaterThan(0);
 });

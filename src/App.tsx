@@ -229,6 +229,13 @@ export default function App() {
   const { data, update, restore, error, ready } = useData();
   const [page, setPage] = useState<Page>("Hoje");
   const [navPulse, setNavPulse] = useState(0);
+  const [iconMotion, setIconMotion] = useState(() => {
+    try {
+      return localStorage.getItem("prumo.icon-motion") !== "off";
+    } catch {
+      return true;
+    }
+  });
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [formError, setFormError] = useState("");
@@ -362,7 +369,7 @@ export default function App() {
     }));
   }
   function switchPage(value: Page) {
-    setNavPulse(n=>n+1);
+    setNavPulse((n) => n + 1);
     setPage(value);
     window.scrollTo({ top: 0, behavior: "instant" });
     requestAnimationFrame(() =>
@@ -1195,6 +1202,25 @@ export default function App() {
                     />
                   </Field>
                 </div>
+                <label className="motion-preference">
+                  <input
+                    type="checkbox"
+                    checked={iconMotion}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setIconMotion(enabled);
+                      try {
+                        localStorage.setItem(
+                          "prumo.icon-motion",
+                          enabled ? "on" : "off",
+                        );
+                      } catch {
+                        /* A preferência continua funcionando nesta sessão. */
+                      }
+                    }}
+                  />
+                  <span>Animar ícones da navegação</span>
+                </label>
                 <div className="backup-actions">
                   <Button
                     type="button"
@@ -2540,6 +2566,7 @@ export default function App() {
       </div>
       <nav
         className="bottom-nav"
+        data-icon-motion={iconMotion ? "on" : "off"}
         aria-label="Navegação principal"
         style={{ "--nav-count": navigation.length } as CSSProperties}
       >
