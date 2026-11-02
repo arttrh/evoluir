@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTrack } from "./catalog.js";
+import { createTrack, templateFor } from "./catalog.js";
 import { roadmapReferences } from "./study-content.js";
 import { safeUrl, uid, type Track } from "./model.js";
 export const studySourceSchema = z.object({
@@ -61,17 +61,8 @@ export function officialSources(query: string): StudySource[] {
     .slice(0, 8);
 }
 export function roadmapFor(query: string) {
-  const q = query.toLowerCase();
-  const key = q.includes("spring")
-    ? "Spring Cloud"
-    : q.includes("docker")
-      ? "Docker"
-      : q.includes("java") && !q.includes("javascript")
-        ? "Java"
-        : q.includes("arquitet")
-          ? "Arquitetura de software"
-          : null;
-  return key ? roadmapReferences[key] : null;
+  const key = templateFor(query);
+  return key === "manual" ? null : roadmapReferences[key];
 }
 export function topicModule(
   query: string,

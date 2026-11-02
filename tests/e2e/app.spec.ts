@@ -1,6 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/news", (route) =>
+    route.fulfill({
+      json: {
+        items: [],
+        updatedAt: "2026-11-02T12:00:00Z",
+        unavailableSources: [],
+      },
+    }),
+  );
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Hoje.", exact: true }),
@@ -221,7 +230,14 @@ test("sem transbordamento em 320, 375, 390, 430 e 1024 px e navegação fixa", a
 }) => {
   for (const width of [320, 375, 390, 430, 1024]) {
     await page.setViewportSize({ width, height: 844 });
-    for (const name of ["Hoje", "Corrida", "Estudos", "Emprego", "Semana"]) {
+    for (const name of [
+      "Hoje",
+      "Corrida",
+      "Estudos",
+      "Emprego",
+      "Semana",
+      "Notícias",
+    ]) {
       await nav(page, name);
       const b = await page.evaluate(() => ({
         scroll: document.documentElement.scrollWidth,
@@ -237,8 +253,15 @@ test("sem transbordamento em 320, 375, 390, 430 e 1024 px e navegação fixa", a
     }
   }
 });
-test("acessibilidade das cinco telas e diálogo", async ({ page }) => {
-  for (const name of ["Hoje", "Corrida", "Estudos", "Emprego", "Semana"]) {
+test("acessibilidade das seis telas e diálogo", async ({ page }) => {
+  for (const name of [
+    "Hoje",
+    "Corrida",
+    "Estudos",
+    "Emprego",
+    "Semana",
+    "Notícias",
+  ]) {
     await nav(page, name);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -391,6 +414,7 @@ test("voz só altera uma tarefa depois da confirmação", async ({ page }) => {
 test("voz registra corrida e conclui treino somente quando vinculado", async ({
   page,
 }) => {
+  await page.setViewportSize({width:320,height:568});
   await addTask(page, "Correr 5 km", "corpo");
   await page
     .getByRole("button", { name: "Comando de voz", exact: true })
@@ -404,6 +428,7 @@ test("voz registra corrida e conclui treino somente quando vinculado", async ({
   await page
     .getByLabel("Concluir também um treino?")
     .selectOption({ label: "Correr 5 km" });
+  await expect(page.getByRole("button", { name: "Confirmar corrida", exact: true })).toBeInViewport();
   await page
     .getByRole("button", { name: "Confirmar corrida", exact: true })
     .click();
@@ -596,4 +621,222 @@ test("movimento reduzido mantém as telas visíveis e desativa animações", asy
         .analyze()
     ).violations,
   ).toEqual([]);
+});
+
+test("ditado conserva pausas, mostra resultados parciais e captura a última palavra antes de confirmar", async ({
+  page,
+}) => {
+  await addTask(page, "Estudar Java");
+  await page.evaluate(() => {
+    (window as any).SpeechRecognition = class {
+      onresult: any;
+      onend: any;
+      onerror: any;
+      continuous = false;
+      interimResults = false;
+      maxAlternatives = 0;
+      lang = "";
+      constructor() {
+        (window as any).speech = this;
+      }
+      start() {
+        (window as any).speechStarts = ((window as any).speechStarts || 0) + 1;
+      }
+      abort() {}
+      stop() {
+        this.onresult?.({
+          results: [
+            { 0: { transcript: "Terminei de estudar" }, isFinal: true },
+            { 0: { transcript: "Java" }, isFinal: true },
+          ],
+        });
+        this.onend?.();
+      }
+    };
+  });
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Falar comando", exact: true })
+    .click();
+  expect(
+    await page.evaluate(() => {
+      const s = (window as any).speech;
+      return [s.continuous, s.interimResults, s.lang];
+    }),
+  ).toEqual([true, true, "pt-BR"]);
+  await page.evaluate(() => {
+    (window as any).speech.onresult({
+      results: [{ 0: { transcript: "Terminei de estudar" }, isFinal: false }],
+    });
+  });
+  await expect(page.getByLabel("Seu comando", { exact: true })).toHaveValue(
+    "Terminei de estudar",
+  );
+  await page.evaluate(() => {
+    (window as any).speech.onend();
+  });
+  expect(await page.evaluate(() => (window as any).speechStarts)).toBe(2);
+  // A nova sessão continua do texto capturado antes da pausa.
+  await page.evaluate(() => {
+    (window as any).speech.onresult({
+      results: [{ 0: { transcript: "Java" }, isFinal: true }],
+    });
+  });
+  await expect(page.getByLabel("Seu comando", { exact: true })).toHaveValue(
+    "Terminei de estudar Java",
+  );
+  // Ao parar, o navegador entrega o resultado final da sessão atual.
+  await page.evaluate(() => {
+    const s = (window as any).speech;
+    s.stop = function () {
+      this.onresult({
+        results: [{ 0: { transcript: "Java" }, isFinal: true }],
+      });
+      this.onend();
+    };
+  });
+  await page
+    .getByRole("button", { name: "Parar e conferir", exact: true })
+    .click();
+  const confirm = page.getByRole("button", {
+    name: "Confirmar conclusão",
+    exact: true,
+  });
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeInViewport();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("evoluir.data.v1")!).tasks[0].status,
+    ),
+  ).toBe("pendente");
+  await confirm.click();
+  await expect(page.getByText("1 de 1 feitas")).toBeVisible();
+});
+
+test("corrige uma transcrição incorreta e confirma tópico de uma trilha", async ({
+  page,
+}) => {
+  await nav(page, "Estudos");
+  await page.getByRole("button", { name: "Criar primeira trilha" }).click();
+  await page.getByLabel("O que você quer aprender?").fill("Java");
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Terminei de estudar tipos coleções e objeto errado");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  await expect(page.getByText(/Não encontrei uma tarefa/)).toBeVisible();
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Terminei de estudar Tipos, coleções e objetos");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Confirmar tópico", exact: true })
+    .click();
+  const topic = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("evoluir.data.v1")!).tracks[0].modules[0]
+        .topics[0],
+  );
+  expect(topic.done).toBe(true);
+  expect(topic.reviewDate).toBeTruthy();
+});
+
+test("notícias filtra manchetes reais do endpoint e mantém última leitura na falha", async ({
+  page,
+}) => {
+  await page.route("**/api/news", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            title: "Novidades do Java",
+            url: "https://inside.java/test",
+            source: "Inside Java",
+            category: "Java",
+            publishedAt: "2026-11-02T10:00:00Z",
+          },
+          {
+            title: "Arquitetura de sistemas",
+            url: "https://martinfowler.com/test",
+            source: "Martin Fowler",
+            category: "Arquitetura",
+            publishedAt: "2026-11-01T10:00:00Z",
+          },
+        ],
+        updatedAt: "2026-11-02T12:00:00Z",
+        unavailableSources: [],
+      },
+    }),
+  );
+  await nav(page, "Notícias");
+  await expect(
+    page.getByRole("link", { name: "Novidades do Java", exact: true }),
+  ).toHaveAttribute("href", "https://inside.java/test");
+  expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
+  await page.getByRole("button", { name: "Arquitetura", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "Novidades do Java", exact: true }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Arquitetura de sistemas", exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Filtrar notícias").fill("inexistente");
+  await expect(page.getByText("Nenhuma manchete neste filtro")).toBeVisible();
+  await page.getByLabel("Filtrar notícias").fill("");
+  await page.route("**/api/news", (route) => route.abort());
+  await page
+    .getByRole("button", { name: "Atualizar notícias", exact: true })
+    .click();
+  await expect(
+    page.getByText(/Mostrando a última leitura salva/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Arquitetura de sistemas", exact: true }),
+  ).toBeVisible();
+});
+
+test("recomenda System Design e cria formação completa em vez de módulo genérico", async ({
+  page,
+}) => {
+  await page.route("**/api/study-search?*", (route) => route.abort());
+  await nav(page, "Estudos");
+  await page
+    .getByRole("button", { name: "System Design", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: /System Design — referência visual/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Criar trilha deste assunto", exact: true })
+    .click();
+  const modules = await page.evaluate(
+    () =>
+      JSON.parse(localStorage.getItem("evoluir.data.v1")!).tracks[0].modules,
+  );
+  expect(modules.length).toBeGreaterThan(4);
+  expect(modules.flatMap((m: any) => m.topics).length).toBeGreaterThan(10);
+});
+
+test("animação da home mantém superfícies de vidro sem transformação", async ({
+  page,
+}) => {
+  await nav(page, "Corrida");
+  await nav(page, "Hoje");
+  const transforms = await page
+    .locator("main .glass")
+    .evaluateAll((nodes) => nodes.map((n) => getComputedStyle(n).transform));
+  expect(transforms.every((t) => t === "none")).toBe(true);
+  await expect(
+    page.getByRole("heading", { name: "Hoje.", exact: true }),
+  ).toBeVisible();
 });

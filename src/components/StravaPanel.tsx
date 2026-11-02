@@ -250,6 +250,13 @@ export function StravaPanel() {
                 O acesso depende do cadastro do Evoluir no Strava. Seus
                 registros manuais continuam funcionando.
               </p>
+              <a
+                href="/conectar-strava.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ver como ativar a conexão
+              </a>
             </div>
           )}
           <details className="help">

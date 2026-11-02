@@ -1,3 +1,4 @@
+import { NewsPage } from "./components/NewsPage";
 import { RunInsights } from "./components/RunInsights";
 import { VoiceCommand } from "./components/VoiceCommand";
 import { StudyExplorer } from "./components/StudyExplorer";
@@ -10,11 +11,13 @@ import {
   type ReactElement,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
 import {
   Mic,
+  Newspaper,
   House,
   Footprints,
   BookOpen,
@@ -68,13 +71,14 @@ import {
 import { download, downloadRecovery, useData } from "./store";
 import { createTrack, templateNames } from "./catalog";
 
-type Page = "Hoje" | "Corrida" | "Estudos" | "Emprego" | "Semana";
+type Page = "Hoje" | "Corrida" | "Estudos" | "Emprego" | "Semana" | "Notícias";
 const navigation: [Page, LucideIcon][] = [
   ["Hoje", House],
   ["Corrida", Footprints],
   ["Estudos", BookOpen],
   ["Emprego", BriefcaseBusiness],
   ["Semana", CalendarDays],
+  ["Notícias", Newspaper],
 ];
 const areaName: Record<Area, string> = {
   corpo: "Corpo",
@@ -387,6 +391,7 @@ export default function App() {
     Estudos: "Aprender · praticar · revisar",
     Emprego: "Carreira · uma ação por vez",
     Semana: "Planejar com espaço para a vida",
+    Notícias: "Ler · entender · acompanhar",
   };
 
   function taskList(tasks: Task[]) {
@@ -2523,12 +2528,17 @@ export default function App() {
               </div>
             </>
           )}
+          {page === "Notícias" && <NewsPage />}
           <footer className="page-footer">
             Uma coisa de cada vez.<span>evoluir.</span>
           </footer>
         </main>
       </div>
-      <nav className="bottom-nav" aria-label="Navegação principal">
+      <nav
+        className="bottom-nav"
+        aria-label="Navegação principal"
+        style={{ "--nav-count": navigation.length } as CSSProperties}
+      >
         <span
           className="nav-indicator"
           aria-hidden="true"

@@ -1519,7 +1519,7 @@ legend {
   position: absolute;
   left: 7px;
   top: 7px;
-  width: calc((100% - 14px) / 5);
+  width: calc((100% - 14px) / var(--nav-count, 6));
   height: calc(100% - 14px);
   background: #e8e0d48c;
   border: 1px solid #eee8dc99;
@@ -1752,32 +1752,6 @@ dialog[open] {
   font-weight: 700;
   color: #373027;
 }
-.voice-orb {
-  position: relative;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, #fff, #e6ddce);
-  border: 1px solid #fff;
-  box-shadow: 0 8px 30px #55412615;
-  display: grid;
-  place-items: center;
-  color: #806a50;
-  margin: 25px auto 20px;
-}
-.voice-orb.listening {
-  animation: breathe 1.5s ease-in-out infinite;
-}
-.voice-orb.listening > span {
-  position: absolute;
-  inset: 0;
-  border: 1px solid #b7a07e;
-  border-radius: 50%;
-  animation: voice-wave 1.8s ease-out infinite;
-}
-.voice-orb.listening > span:last-child {
-  animation-delay: 0.7s;
-}
 .voice-start {
   width: 100%;
   margin-bottom: 24px;
@@ -1871,12 +1845,7 @@ dialog[open] {
     box-shadow: 0 0 0 12px #c7b59030;
   }
 }
-@keyframes voice-wave {
-  to {
-    transform: scale(1.6);
-    opacity: 0;
-  }
-}
+
 @media (max-width: 700px) {
   .study-explorer {
     padding: 20px;
@@ -1902,7 +1871,7 @@ dialog[open] {
   .nav-indicator {
     left: 6px;
     top: 6px;
-    width: calc((100% - 12px) / 5);
+    width: calc((100% - 12px) / var(--nav-count, 6));
     height: calc(100% - 12px);
   }
   .study-explorer .explorer-icon {
@@ -1968,4 +1937,262 @@ dialog[open] {
   .progress span {
     transition: none;
   }
+}
+.voice-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.voice-controls .voice-start {
+  flex: 1;
+  margin: 0;
+}
+.voice-compact .dialog-description {
+  margin-bottom: 15px;
+  font-size: 12px;
+}
+.voice-compact .field {
+  margin-bottom: 10px;
+}
+.voice-compact textarea {
+  min-height: 88px;
+  max-height: 135px;
+}
+.voice-compact .command-preview {
+  margin-top: 10px;
+  padding: 14px;
+}
+.voice-compact .command-preview h3 {
+  font-size: 17px;
+  margin: 7px 0;
+}
+.voice-compact .command-preview p {
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.voice-compact .help {
+  margin-top: 12px;
+}
+.voice-confirm {
+  position: sticky;
+  bottom: 0;
+  background: #faf9f6f5;
+  padding: 10px 0 0;
+  z-index: 2;
+}
+.voice-confirm .button {
+  width: 100%;
+  min-height: 48px;
+}
+.listening-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #735c3d;
+  margin-bottom: 12px;
+}
+.listening-status > span {
+  width: 7px;
+  height: 7px;
+  background: #91734e;
+  border-radius: 50%;
+  animation: breathe 1.5s ease-in-out infinite;
+}
+.news-intro {
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 25px;
+}
+.news-intro h2 {
+  font-size: 21px;
+  font-weight: 650;
+}
+.news-intro p {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 570px;
+  margin-top: 9px;
+}
+.news-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 17px;
+}
+.news-categories {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.news-categories button {
+  background: #efebe3;
+  font-size: 11px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 22px;
+  color: #6b5c48;
+}
+.news-categories button[aria-pressed="true"] {
+  background: #292722;
+  color: #fff;
+}
+.news-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e0d7c7;
+  border-radius: 12px;
+  padding: 0 12px;
+  color: #8f795a;
+  background: #fff9;
+}
+.news-search input {
+  border: 0;
+  background: none;
+  max-width: 210px;
+  padding: 10px 0;
+  font-size: 16px;
+}
+.news-updated {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #796f60;
+  margin-bottom: 20px;
+}
+.news-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.news-card {
+  padding: 23px;
+  border: 1px solid #fff;
+  background: #fff9;
+  border-radius: 20px;
+  box-shadow: 0 5px 22px #46341406;
+}
+.news-featured {
+  background: linear-gradient(130deg, #fff, #ece3d35c);
+  border-color: #eee5d5;
+}
+.news-card-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9px;
+  color: #7d6d56;
+}
+.news-card-meta > span {
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.news-card h3 {
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.5;
+  margin: 18px 0 24px;
+  overflow-wrap: anywhere;
+  letter-spacing: -0.4px;
+}
+.news-card h3 a {
+  color: #312c24;
+  text-decoration: none;
+}
+.news-card h3 a:hover {
+  text-decoration: underline;
+}
+.news-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #74644e;
+}
+.news-card-footer > a {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: #eee6d95e;
+  border-radius: 50%;
+}
+.news-loading {
+  display: grid;
+  place-items: center;
+  padding: 60px 15px;
+  gap: 16px;
+  color: #8b7556;
+  font-size: 13px;
+}
+.news-disclosure {
+  font-size: 10px;
+  color: #797163;
+  line-height: 1.8;
+  margin-top: 30px;
+}
+.news-page > .planning-note {
+  margin-bottom: 20px;
+}
+@media (max-width: 700px) {
+  .news-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .news-card {
+    padding: 20px;
+  }
+  .news-card h3 {
+    font-size: 18px;
+  }
+  .news-intro h2 {
+    font-size: 18px;
+  }
+  .news-toolbar {
+    gap: 12px;
+  }
+  .news-search {
+    width: 100%;
+  }
+  .news-search input {
+    max-width: none;
+    width: 100%;
+  }
+  .news-categories button {
+    font-size: 10px;
+    padding: 10px 12px;
+  }
+  .bottom-nav button {
+    font-size: 9px;
+  }
+  .bottom-nav {
+    gap: 0;
+  }
+  .voice-compact .button {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listening-status > span {
+    animation: none;
+  }
+}
+
+.study-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.study-suggestions .chip {
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
 }

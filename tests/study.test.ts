@@ -68,3 +68,47 @@ it("foco em Gateway e Eureka usa prática específica e referências do tópico"
     new Set([...gateway.topics, ...eureka.topics].map((t) => t.id)).size,
   ).toBe(gateway.topics.length + eureka.topics.length);
 });
+it.each([
+  "Java",
+  "Docker",
+  "System design",
+  "Arquiteturas de projetos",
+  "Backend",
+])(
+  "oferece progressão, recursos contextualizados e expansão segura: %s",
+  (title) => {
+    const track = createTrack(title, "auto");
+    expect(track.modules.length).toBeGreaterThanOrEqual(4);
+    expect(track.modules[0].title).toContain("Básico");
+    expect(track.modules.some((m) => m.title.includes("Avançado"))).toBe(true);
+    expect(roadmapFor(title)).toBeTruthy();
+    expect(() =>
+      dataSchema.parse({ ...emptyData(), tracks: [track] }),
+    ).not.toThrow();
+    expect(
+      track.modules
+        .flatMap((m) => m.topics)
+        .every(
+          (t) =>
+            t.resources.length &&
+            t.criteria.length > 20 &&
+            t.exercise.length > 20,
+        ),
+    ).toBe(true);
+    const old = {
+      ...track,
+      modules: [
+        {
+          ...track.modules[0],
+          topics: [{ ...track.modules[0].topics[0], done: true }],
+        },
+      ],
+    };
+    const full = expandTrack(old);
+    expect(full.modules[0]).toEqual(old.modules[0]);
+    expect(trackProgress(full).total).toBe(trackProgress(track).total);
+    expect(trackProgress(expandTrack(full)).total).toBe(
+      trackProgress(full).total,
+    );
+  },
+);

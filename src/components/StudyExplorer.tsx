@@ -14,7 +14,7 @@ import {
   topicModule,
   type StudySource,
 } from "../study-sources";
-import { createTrack, expandTrack } from "../catalog";
+import { createTrack, expandTrack, hasExpansion } from "../catalog";
 import { uid, type Data, type Track } from "../model";
 import { z } from "zod";
 export function StudyExplorer({
@@ -32,15 +32,15 @@ export function StudyExplorer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState("");
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
+  async function searchFor(value: string) {
+    setQuery(value);
     setBusy(true);
     setError("");
     setSources([]);
     setSearched("");
     try {
       const response = await fetch(
-        `/api/study-search?q=${encodeURIComponent(query.trim())}`,
+        `/api/study-search?q=${encodeURIComponent(value.trim())}`,
         { signal: AbortSignal.timeout(10000) },
       );
       if (!response.ok) throw new Error();
@@ -49,10 +49,10 @@ export function StudyExplorer({
         .parse(await response.json());
       setSources(result.sources);
       setError(result.warning);
-      setSearched(query.trim());
+      setSearched(value.trim());
     } catch {
-      setSources(officialSources(query));
-      setSearched(query.trim());
+      setSources(officialSources(value));
+      setSearched(value.trim());
       setError(
         "Sem resposta da busca online. Mostrando apenas o catálogo oficial disponível no aplicativo.",
       );
@@ -110,7 +110,13 @@ export function StudyExplorer({
         Busque um assunto e escolha o foco. Documentação primeiro, prática
         depois, revisão para consolidar.
       </p>
-      <form className="study-search" onSubmit={search}>
+      <form
+        className="study-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void searchFor(query);
+        }}
+      >
         <label className="sr-only" htmlFor="study-query">
           Assunto para pesquisar
         </label>
@@ -132,6 +138,24 @@ export function StudyExplorer({
           <span>{busy ? "Buscando" : "Buscar fontes"}</span>
         </button>
       </form>
+      <div className="study-suggestions" aria-label="Sugestões de estudo">
+        {[
+          "Java",
+          "System Design",
+          "Arquiteturas de projetos",
+          "Backend",
+          "Docker",
+        ].map((subject) => (
+          <button
+            key={subject}
+            className="chip"
+            disabled={busy}
+            onClick={() => void searchFor(subject)}
+          >
+            {subject}
+          </button>
+        ))}
+      </div>
       {error && (
         <p className="planning-note" role="status">
           {error}
@@ -205,27 +229,25 @@ export function StudyExplorer({
           <ArrowUpRight size={17} />
         </a>
       )}
-      {track &&
-        track.modules.flatMap((m) => m.topics).length < 10 &&
-        /spring.*cloud/i.test(track.title) && (
-          <button
-            className="text-button"
-            onClick={() =>
-              onChange(
-                (d) => ({
-                  ...d,
-                  tracks: d.tracks.map((t) =>
-                    t.id === track.id ? expandTrack(t) : t,
-                  ),
-                }),
-                "Trilha ampliada. Seu progresso anterior foi preservado.",
-              )
-            }
-          >
-            <Plus size={16} />
-            Ampliar trilha com fundamentos, segurança, mensageria e projeto
-          </button>
-        )}
+      {track && hasExpansion(track) && (
+        <button
+          className="text-button"
+          onClick={() =>
+            onChange(
+              (d) => ({
+                ...d,
+                tracks: d.tracks.map((t) =>
+                  t.id === track.id ? expandTrack(t) : t,
+                ),
+              }),
+              "Trilha ampliada. Seu progresso anterior foi preservado.",
+            )
+          }
+        >
+          <Plus size={16} />
+          Ampliar trilha do básico ao avançado
+        </button>
+      )}
     </section>
   );
 }

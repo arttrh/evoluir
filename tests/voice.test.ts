@@ -59,3 +59,27 @@ describe("comandos de voz sem efeitos colaterais", () => {
     ).toBe("unknown");
   });
 });
+it.each([
+  "Ainda não estudei Java",
+  "Vou estudar Java",
+  "Quase terminei estudar Java",
+])("não conclui intenções ou negações: %s", (text) =>
+  expect(parseCommand(text, [task("1", "Estudar Java")]).kind).toBe("unknown"),
+);
+it.each([
+  ["Terminei de estudar Java", "Estudar Java"],
+  ["Enviei as candidaturas", "Enviar duas candidaturas"],
+  ["Revisei meu currículo", "Revisar currículo"],
+  ["Resolvi o exercício prático", "Resolver exercício prático"],
+])("entende conclusão natural: %s", (text, title) =>
+  expect(parseCommand(text, [task("1", title)])).toMatchObject({
+    kind: "complete",
+    taskIds: ["1"],
+  }),
+);
+it.each([
+  ["Corri cinco vírgula cinco km em meia hora", 5.5, 1800],
+  ["Corri um km e meio em quinze minutos e trinta segundos", 1.5, 930],
+])("entende números naturais: %s", (text, distance, seconds) =>
+  expect(parseCommand(text, [])).toEqual({ kind: "run", distance, seconds }),
+);

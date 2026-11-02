@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Conectar corridas — Evoluir</title>
+    <style>
+      body {
+        font:
+          16px/1.8 system-ui,
+          sans-serif;
+        color: #252420;
+        background: #faf9f6;
+        max-width: 720px;
+        margin: 24px auto;
+        padding: 24px;
+      }
+      a {
+        color: #745635;
+      }
+      h1 {
+        line-height: 1.2;
+      }
+      h2 {
+        margin-top: 32px;
+      }
+      li {
+        margin-bottom: 12px;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+      aside {
+        background: #eee7dc;
+        padding: 18px;
+        border-radius: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="/">← Voltar ao Evoluir</a>
+    <h1>Suas corridas, conectadas.</h1>
+    <p>
+      A conexão com o Strava está implementada, mas precisa das credenciais da
+      sua aplicação antes da primeira autorização. Os registros manuais
+      funcionam enquanto isso.
+    </p>
+    <h2>1. Cadastrar a aplicação Strava</h2>
+    <ol>
+      <li>
+        Abra
+        <a
+          href="https://www.strava.com/settings/api"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Strava API Settings</a
+        >. A documentação atual exige assinatura Strava para cadastrar uma
+        aplicação. O acesso inicial é limitado ao próprio atleta.
+      </li>
+      <li>
+        Informe nome: <strong>Evoluir</strong>; website:
+        <code>https://evoluir-hazel.vercel.app</code>; Authorization Callback
+        Domain: <code>evoluir-hazel.vercel.app</code>.
+      </li>
+      <li>
+        O endereço completo de retorno usado pelo aplicativo é
+        <code>https://evoluir-hazel.vercel.app/api/strava?op=callback</code>.
+      </li>
+    </ol>
+    <h2>2. Ativar na Vercel</h2>
+    <p>
+      Nas configurações do projeto Evoluir → Environment Variables → Production,
+      cadastre:
+    </p>
+    <ul>
+      <li>
+        <code>APP_ORIGIN</code>: <code>https://evoluir-hazel.vercel.app</code>.
+      </li>
+      <li>
+        <code>STRAVA_CLIENT_ID</code> e <code>STRAVA_CLIENT_SECRET</code>: os
+        valores privados fornecidos pelo Strava.
+      </li>
+      <li>
+        <code>STRAVA_SESSION_SECRET</code>: um segredo aleatório de pelo menos
+        32 caracteres, criado pelo gerador do seu gerenciador de senhas.
+      </li>
+    </ul>
+    <p>
+      Marque os segredos como sensíveis. Faça um novo deploy para aplicar as
+      variáveis. Abra Corrida no Evoluir, leia o consentimento e toque em
+      <strong>Conectar minha conta Strava</strong>.
+    </p>
+    <aside>
+      Cadastre as credenciais diretamente na Vercel. Não as envie em chat, não
+      use prefixo VITE_ e não coloque valores reais no código ou no GitHub.
+    </aside>
+    <h2>3. Se você corre com Nike Run Club</h2>
+    <p>
+      No NRC, abra Perfil → Configurações → Parceiros → Strava e autorize. Essa
+      conexão envia as <strong>novas corridas</strong>; não transfere o
+      histórico anterior. Depois de uma corrida sincronizada, abra Corrida →
+      Consultar corridas no Evoluir.
+    </p>
+    <p>
+      As atividades do Strava são uma consulta privada temporária. Não entram
+      nos backups nem atualizam as metas de registros manuais.
+    </p>
+    <h2>Atalho no iPhone: ideia para uma próxima etapa</h2>
+    <p>
+      O Tocar Atrás aceita dois ou três toques. Você pode atribuir um atalho em
+      Ajustes → Acessibilidade → Toque → Tocar Atrás. Use um atalho que abra o
+      app de corrida; iniciar a gravação depende das ações oferecidas pelo NRC
+      ou Strava no seu aparelho.
+    </p>
+    <p>
+      O Evoluir ainda não mede distância por GPS e não registra corridas em
+      segundo plano. Grave no aplicativo de corrida e consulte depois. Não
+      calculamos quilômetros apenas com um cronômetro.
+    </p>
+    <p>
+      Referências:
+      <a href="https://developers.strava.com/docs/getting-started/"
+        >Strava Developers</a
+      >
+      ·
+      <a
+        href="https://support.strava.com/en-us/articles/15401850-nike-and-strava"
+        >Nike e Strava</a
+      >
+      ·
+      <a href="https://support.apple.com/guide/iphone/back-tap-iphaa57e7885/ios"
+        >Tocar Atrás no iPhone</a
+      >.
+    </p>
+  </body>
+</html>

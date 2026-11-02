@@ -6,32 +6,30 @@ export function usePageMotion(
   ready: boolean,
 ) {
   useLayoutEffect(() => {
-    if (!ready || !ref.current) return;
+    const main = ref.current;
+    if (!ready || !main) return;
     const media = gsap.matchMedia();
     media.add("(prefers-reduced-motion: no-preference)", () => {
+      // Superfícies com backdrop-filter ficam paradas para evitar recomposição pesada no iPhone.
+      const targets = Array.from(
+        main.querySelectorAll(".page-heading, .intro, .section-heading"),
+      )
+        .filter((n) => !n.closest(".glass"))
+        .slice(0, 6);
       const context = gsap.context(() => {
         gsap.fromTo(
-          ".page-heading",
-          { y: 14 },
+          targets,
+          { y: 8 },
           {
             y: 0,
-            duration: 0.55,
-            ease: "power3.out",
+            duration: 0.32,
+            stagger: 0.025,
+            ease: "power2.out",
+            overwrite: "auto",
             clearProps: "transform",
           },
         );
-        gsap.fromTo(
-          ".intro, .stack > section, .daily-overview, .two-column > section, .track-selector, .study-explorer, .week-days",
-          { y: 22 },
-          {
-            y: 0,
-            duration: 0.65,
-            stagger: 0.07,
-            ease: "power3.out",
-            clearProps: "transform",
-          },
-        );
-      }, ref);
+      }, main);
       return () => context.revert();
     });
     return () => media.revert();

@@ -322,6 +322,14 @@ export const roadmapReferences: Record<string, { title: string; url: string }> =
       title: "Backend — referência de fundamentos",
       url: "https://roadmap.sh/backend",
     },
+    "System Design": {
+      title: "System Design — referência visual",
+      url: "https://roadmap.sh/system-design",
+    },
+    Backend: {
+      title: "Backend — referência visual",
+      url: "https://roadmap.sh/backend",
+    },
     Java: { title: "Java — referência visual", url: "https://roadmap.sh/java" },
     Docker: {
       title: "Docker — referência visual",

@@ -8,11 +8,12 @@ Um espaço pessoal para corpo, estudos e carreira. PWA responsivo, com fundo cla
 
 - Tarefas por área, conclusão, reabertura, planejamento semanal e histórico de reagendamentos.
 - Corridas manuais, ritmo calculado, meta semanal, evolução por semana/mês e resumo mensal.
-- Trilhas editáveis, prática, critérios e revisão. Spring Cloud tem 8 módulos e 20 tópicos. Trilhas antigas podem ser ampliadas sem perder progresso.
+- Trilhas editáveis, prática, critérios e revisão. Spring Cloud tem 8 módulos e 20 tópicos. Java, Docker, Backend, System Design e Arquitetura também seguem do básico ao avançado. Trilhas antigas podem ser ampliadas sem perder progresso.
 - Busca de referências: documentação oficial do catálogo primeiro, discussões com respostas aceitas pela API pública do Stack Exchange depois. Roadmap.sh aparece como referência externa, sem cópia ou scraping.
 - Definição de tópicos prioritários para montar uma trilha editável a partir de um assunto. A aplicação não usa IA para inventar uma formação ou avaliar a qualidade de qualquer link na internet.
 - Vagas, candidaturas, contatos e objetivos profissionais.
-- Comandos de voz em português, sempre com prévia e confirmação. Exemplos: “Concluí revisar currículo” e “Corri cinco quilômetros em trinta e cinco minutos”. Há alternativa por texto e pelo ditado do teclado.
+- Notícias de Java, Spring e arquitetura via RSS/Atom de Inside Java, Spring Blog, InfoQ e Martin Fowler. Filtros por categoria e manchete, datas e links originais, sem reproduzir artigos. A última leitura fica em sessionStorage para falhas temporárias; não são notificações push.
+- Comandos de voz em português, com transcrição ao vivo, pausas, edição e confirmação. Escuta de até 60 segundos com até três retomadas se o navegador encerrar sozinho. Estudos podem concluir tarefas ou tópicos de trilhas; emprego conclui tarefas; corrida registra distância e duração informadas. Exemplos: “Concluí revisar currículo” e “Corri cinco quilômetros em trinta e cinco minutos”. Há alternativa por texto e pelo ditado do teclado.
 - PWA offline para os dados manuais, fontes locais, exportação e restauração de backup.
 
 ## Executar e validar
@@ -24,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-O servidor de desenvolvimento atende também `/api/study-search` e `/api/strava`, usando os mesmos handlers da Vercel. Sem credenciais Strava, o aplicativo informa que a conexão ainda não está ativada. Buscas online dependem da disponibilidade e quota do Stack Exchange; o catálogo oficial é o fallback.
+O servidor de desenvolvimento atende também `/api/study-search` e `/api/strava`, além de `/api/news`, usando os mesmos handlers da Vercel. Sem credenciais Strava, o aplicativo informa que a conexão ainda não está ativada. Buscas online dependem da disponibilidade e quota do Stack Exchange; o catálogo oficial é o fallback.
 
 ```sh
 npm test
@@ -39,7 +40,7 @@ Testes incluem a lógica de voz, ambiguidade, validação de dados, preservaçã
 
 Existe integração oficial Nike → Strava para **novas** corridas; ela não migra o histórico anterior. Configure no NRC: Perfil → Configurações → Parceiros → Strava. [Instruções oficiais](https://support.strava.com/en-us/articles/15401850-nike-and-strava).
 
-1. Cadastre uma aplicação em [Strava API Settings](https://www.strava.com/settings/api). Confira os requisitos e limites do seu nível de acesso; um app novo pode ter acesso apenas ao próprio atleta.
+1. Cadastre uma aplicação em [Strava API Settings](https://www.strava.com/settings/api). A documentação atual exige assinatura Strava para cadastrar uma aplicação. Confira os requisitos e limites do seu nível de acesso; um app novo pode ter acesso apenas ao próprio atleta.
 2. Use `evoluir-hazel.vercel.app` como Authorization Callback Domain. O retorno é `https://evoluir-hazel.vercel.app/api/strava?op=callback`.
 3. Nas variáveis **server-only** da Vercel, configure `APP_ORIGIN`, `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` e `STRAVA_SESSION_SECRET`. O último deve ter no mínimo 32 caracteres aleatórios. Consulte `.env.example`; nunca use prefixo `VITE_`, nem inclua valores reais no Git.
 4. Faça um novo deploy para aplicar as variáveis. Na área Corrida, leia o consentimento e conecte sua própria conta.
@@ -57,3 +58,7 @@ O reconhecimento de voz depende do navegador e das permissões. Alguns navegador
 ## Instalar no iPhone
 
 Safari → Compartilhar → **Adicionar à Tela de Início**. Abra uma vez com internet para preparar o cache. Registros manuais funcionam offline; busca de fontes, voz online e Strava podem precisar de internet. A barra de rolagem visual é ocultada, preservando toque, mouse e teclado. Preferência por redução de movimento é respeitada.
+
+## Atalhos e movimento no iPhone
+
+[Guia de conexão e atalhos](https://evoluir-hazel.vercel.app/conectar-strava.html). Tocar Atrás aceita dois ou três toques, conforme a Apple. O atalho pode abrir um gravador nativo; o início automático depende das ações que ele disponibiliza. Gravação GPS em segundo plano no Evoluir fica fora desta entrega. As superfícies de vidro ficam paradas durante as transições para evitar recomposição custosa; GSAP anima somente cabeçalhos leves. A fluidez física e o microfone ainda precisam ser conferidos em Safari no aparelho.
