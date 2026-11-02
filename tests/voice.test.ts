@@ -83,3 +83,101 @@ it.each([
 ])("entende números naturais: %s", (text, distance, seconds) =>
   expect(parseCommand(text, [])).toEqual({ kind: "run", distance, seconds }),
 );
+
+import { createTrack } from "../src/catalog";
+it.each([
+  "Estudei Spring Cloud",
+  "Estudei springcloud",
+  "Já estudei Spring Cloud por trinta minutos",
+])(
+  "reconhece a trilha sem exigir tarefa diária com o mesmo título: %s",
+  (text) => {
+    const track = createTrack("Spring Cloud", "auto");
+    const intent = parseCommand(text, [], [track]);
+    expect(intent).toMatchObject({
+      kind: "study",
+      suggestedTopicId: track.modules[0].topics[0].id,
+      courseTitle: "Spring Cloud",
+    });
+    expect(track.modules.flatMap((m) => m.topics).every((t) => !t.done)).toBe(
+      true,
+    );
+  },
+);
+it("usa o próximo tópico pendente e não conclui uma trilha inteira", () => {
+  const track = createTrack("Spring Cloud", "auto");
+  track.modules[0].topics[0].done = true;
+  expect(parseCommand("Estudei Spring Cloud", [], [track])).toMatchObject({
+    kind: "study",
+    suggestedTopicId: track.modules[0].topics[1].id,
+  });
+});
+it.each([
+  "Estudei Service Discovery de Spring Cloud",
+  "Estudei Spring Cloud: Service Discovery",
+])("entende assunto e contexto juntos: %s", (text) => {
+  const track = createTrack("Spring Cloud", "auto");
+  const expected = track.modules
+    .flatMap((m) => m.topics)
+    .find((t) => t.title === "Service Discovery com Eureka")!;
+  expect(parseCommand(text, [], [track])).toMatchObject({
+    kind: "study",
+    topicIds: [expected.id],
+  });
+});
+it("mantém escolha explícita quando duas trilhas têm o mesmo assunto", () => {
+  const a = createTrack("Spring Cloud", "auto"),
+    b = createTrack("Spring Cloud", "auto");
+  const intent = parseCommand("Estudei Spring Cloud", [], [a, b]);
+  expect(intent.kind).toBe("study");
+  expect(intent).not.toHaveProperty("suggestedTopicId");
+});
+it.each(["Estudei GoLang", "Terminei de estudar Go", "Estudei Golengue"])(
+  "entende nomes alternativos de outra tecnologia: %s",
+  (text) => {
+    const track = createTrack("Go", "auto");
+    expect(parseCommand(text, [], [track])).toMatchObject({
+      kind: "study",
+      suggestedTopicId: track.modules[0].topics[0].id,
+    });
+  },
+);
+it("não troca Java por JavaScript nem registra envio como estudo", () => {
+  const track = createTrack("JavaScript", "auto");
+  expect(parseCommand("Estudei Java", [], [track]).kind).toBe("unknown");
+  expect(parseCommand("Enviei JavaScript", [], [track]).kind).toBe("unknown");
+});
+it("aceita Java Script separado sem confundir com a trilha Java", () => {
+  const java = createTrack("Java", "auto"),
+    js = createTrack("JavaScript", "auto");
+  const result = parseCommand("Estudei Java Script", [], [java, js]);
+  expect(result).toMatchObject({
+    kind: "study",
+    courseTitle: "JavaScript",
+    suggestedTopicId: js.modules[0].topics[0].id,
+  });
+});
+it("prioriza o tópico citado em vez de todos os tópicos do módulo", () => {
+  const track = createTrack("Java", "auto");
+  const jdbc = track.modules
+    .flatMap((m) => m.topics)
+    .find((t) => t.title === "JDBC, consultas parametrizadas e transações")!;
+  expect(parseCommand("Estudei JDBC de Java", [], [track])).toMatchObject({
+    kind: "study",
+    topicIds: [jdbc.id],
+  });
+});
+it("usa a referência técnica para reconhecer JPA sem depender do título literal", () => {
+  const track = createTrack("Java", "auto");
+  const jpa = track.modules
+    .flatMap((m) => m.topics)
+    .find((t) => t.title === "Spring Data, paginação e consultas eficientes")!;
+  expect(parseCommand("Estudei JPA", [], [track])).toMatchObject({
+    kind: "study",
+    topicIds: [jpa.id],
+  });
+  expect(parseCommand("Estudei JPA de Java", [], [track])).toMatchObject({
+    kind: "study",
+    topicIds: [jpa.id],
+  });
+});

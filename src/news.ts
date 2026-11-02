@@ -46,18 +46,58 @@ export const newsSearchTerms: Record<string, string> = {
   Arquitetura: "architecture",
 };
 export const newsItemSchema = z.object({
-  title: z.string().min(1).max(500),
+  title: z.string().trim().min(1).max(500),
   url: z
     .string()
     .url()
-    .refine((u) => new URL(u).protocol === "https:"),
+    .max(2000)
+    .refine((u) => {
+      const parsed = new URL(u);
+      return (
+        parsed.protocol === "https:" && !parsed.username && !parsed.password
+      );
+    }),
   source: z.string().min(1).max(100),
   category: z.enum(publicationCategories),
   publishedAt: z.string().datetime(),
+  dateKind: z.enum(["published", "shared"]).optional(),
 });
 export const newsResponseSchema = z.object({
-  items: z.array(newsItemSchema).max(60),
+  items: z.array(newsItemSchema).max(80),
   updatedAt: z.string().datetime(),
+  page: z.number().int().min(0).max(9).optional(),
+  hasMore: z.boolean().optional(),
   unavailableSources: z.array(z.string()).max(20),
 });
 export type NewsItem = z.infer<typeof newsItemSchema>;
+
+export function newsKey(value: string) {
+  const url = new URL(value);
+  url.hash = "";
+  for (const key of [...url.searchParams.keys()])
+    if (/^utm_|^(fbclid|gclid|mc_cid|mc_eid)$/i.test(key))
+      url.searchParams.delete(key);
+  url.searchParams.sort();
+  if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/$/, "");
+  return url.href;
+}
+
+export function readNewsHistory(raw: string | null): string[] {
+  try {
+    return z
+      .array(z.string().max(2000))
+      .max(2000)
+      .parse(JSON.parse(raw || "[]"));
+  } catch {
+    return [];
+  }
+}
+export function mergeNews(previous: NewsItem[], next: NewsItem[]) {
+  const seen = new Set<string>();
+  return [...previous, ...next].filter((item) => {
+    const key = newsKey(item.url);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

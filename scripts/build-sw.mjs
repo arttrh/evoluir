@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 const files = (await readdir("dist", { recursive: true }))
   .filter(
     (f) =>
-      /\.(html|js|css|woff2|svg|png|webmanifest)$/.test(f) && f !== "sw.js",
+      /\.(html|js|css|woff2|svg|png|json|webmanifest)$/.test(f) && f !== "sw.js",
   )
   .sort();
 const hash = createHash("sha256");

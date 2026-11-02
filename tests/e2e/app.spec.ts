@@ -100,17 +100,19 @@ test("cria trilha, conclui tópico e agenda revisão", async ({ page }) => {
     .filter({ hasText: "Configurar os serviços" })
     .click();
   await expect(
-    page.getByRole("link", { name: /Spring Cloud — Overview/ }),
+    page.locator(
+      '.topic[open] a[href="https://spring.io/projects/spring-cloud"]',
+    ),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Concluir tópico", exact: true })
     .first()
     .click();
   await page.getByRole("button", { name: "Confirmar", exact: true }).click();
-  await expect(page.getByText("1 de 20 tópicos concluídos")).toBeVisible();
+  await expect(page.getByText("1 de 25 tópicos concluídos")).toBeVisible();
   await page.reload();
   await nav(page, "Estudos");
-  await expect(page.getByText("1 de 20 tópicos concluídos")).toBeVisible();
+  await expect(page.getByText("1 de 25 tópicos concluídos")).toBeVisible();
 });
 test("salva vaga, atualiza status e não executa notas", async ({ page }) => {
   await nav(page, "Emprego");
@@ -745,10 +747,10 @@ test("corrige uma transcrição incorreta e confirma tópico de uma trilha", asy
   await page
     .getByRole("button", { name: "Confirmar tópico", exact: true })
     .click();
-  const topic = await page.evaluate(
-    () =>
-      JSON.parse(localStorage.getItem("evoluir.data.v1")!).tracks[0].modules[0]
-        .topics[0],
+  const topic = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!)
+      .tracks[0].modules.flatMap((m: any) => m.topics)
+      .find((t: any) => t.title === "Tipos, coleções e objetos"),
   );
   expect(topic.done).toBe(true);
   expect(topic.reviewDate).toBeTruthy();
@@ -871,7 +873,7 @@ test("Go gera uma trilha pronta sem preencher módulos nem tópicos", async ({
     .click();
   await expect(page.getByText("Trilha pronta", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("6 módulos · 12 tópicos", { exact: true }),
+    page.getByText("7 módulos · 14 tópicos", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Criar trilha deste assunto", exact: true })
@@ -879,7 +881,7 @@ test("Go gera uma trilha pronta sem preencher módulos nem tópicos", async ({
   const track = await page.evaluate(
     () => JSON.parse(localStorage.getItem("evoluir.data.v1")!).tracks[0],
   );
-  expect(track.modules).toHaveLength(6);
+  expect(track.modules).toHaveLength(7);
   expect(
     track.modules
       .flatMap((m: any) => m.topics)
@@ -923,62 +925,57 @@ test("busca de notícias Go não depende de manchetes Java já carregadas", asyn
   ).toBeVisible();
   expect(requested).toBe("Golang");
 });
-test("cada ícone tem movimento próprio e redução de movimento interrompe todas as animações", async ({
-  page,
-}) => {
-  const names = new Set<string>();
-  for (const label of [
-    "Hoje",
-    "Corrida",
-    "Estudos",
-    "Emprego",
-    "Semana",
-    "Notícias",
-  ]) {
+test("Lordicon usa um ícone local por aba e respeita movimento reduzido", async ({ page }) => {
+  const sources = new Set<string>();
+  for (const label of ["Hoje", "Corrida", "Estudos", "Emprego", "Semana", "Notícias"]) {
     await nav(page, label);
-    const animations = await page
-      .getByRole("navigation")
-      .getByRole("button", { name: label, exact: true })
-      .locator(".nav-glyph")
-      .evaluate((el) =>
-        el
-          .getAnimations({ subtree: true })
-          .map((a) => (a as CSSAnimation).animationName),
-      );
-    expect(animations.length).toBeGreaterThan(0);
-    names.add(animations[0]);
+    const icon = page.getByRole("navigation").getByRole("button", { name: label, exact: true }).locator("lord-icon");
+    await expect.poll(() => icon.evaluate((e: any) => e.ready)).toBe(true);
+    await expect.poll(() => icon.evaluate((e: any) => e.player.playing)).toBe(true);
+    sources.add((await icon.getAttribute("src"))!);
+    expect(await icon.getAttribute("src")).toMatch(/^\/icons\/lordicon\/.+\.json$/);
   }
-  expect(names.size).toBe(6);
+  expect(sources.size).toBe(6);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(
-    await page
-      .locator("nav .nav-glyph")
-      .evaluateAll(
-        (nodes) =>
-          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
-      ),
-  ).toBe(0);
+  await expect.poll(() => page.locator("nav lord-icon").evaluateAll((nodes: any[]) => nodes.some(e => e.player?.playing))).toBe(false);
 });
+test.describe("ícones sem cache do service worker", () => {
+  test.use({ serviceWorkers: "block" });
+test("falha da animação conserva o ícone estático e a navegação", async ({ page }) => {
+  await page.route("**/icons/lordicon/*.json", route => route.abort());
+  await page.reload();
+  await expect(page.locator('nav [data-nav="Hoje"] lord-icon img')).toBeVisible();
+  await nav(page, "Estudos");
+  await expect(page.getByRole("heading", {name:"Estudos.",exact:true})).toBeVisible();
+  await expect(page.getByRole("link", {name:"Ícones animados por Lordicon.com"})).toBeVisible();
+});
+ });
 test("trocar semanas anima dias, muda as datas e preserva as tarefas", async ({
   page,
 }) => {
   await addTask(page, "Tarefa preservada");
   await nav(page, "Semana");
   const before = await page.locator(".week-days").innerText();
+  await page.locator(".week-days").evaluate((root) => {
+    const original = (root as HTMLElement).innerText;
+    const observer = new MutationObserver(() => {
+      if (
+        (root as HTMLElement).innerText !== original &&
+        [...root.children].some((node) => (node as HTMLElement).style.transform)
+      ) {
+        root.setAttribute("data-observed-motion", "true");
+        observer.disconnect();
+      }
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["style"], subtree: true });
+  });
   await page
     .getByRole("button", { name: "Próxima semana", exact: true })
     .click();
   await expect
     .poll(() => page.locator(".week-days").innerText())
     .not.toBe(before);
-  await page.waitForTimeout(30);
-  expect(
-    await page
-      .locator(".week-days button")
-      .evaluateAll((nodes) =>
-        nodes.some((n) => getComputedStyle(n).transform !== "none"),
-      ),
-  ).toBe(true);
+  await expect(page.locator(".week-days")).toHaveAttribute("data-observed-motion", "true");
   await page
     .getByRole("button", { name: "Semana anterior", exact: true })
     .click();
@@ -1028,25 +1025,267 @@ test("pausa o movimento dos ícones nas preferências e preserva a escolha após
     ).violations,
   ).toEqual([]);
   await page.keyboard.press("Escape");
-  expect(
-    await page
-      .locator("nav .nav-glyph")
-      .evaluateAll(
-        (nodes) =>
-          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
-      ),
-  ).toBe(0);
+  await expect.poll(() => page.locator("nav lord-icon").evaluateAll((nodes: any[]) => nodes.some(e => e.player?.playing))).toBe(false);
   await page.reload();
   await page.getByLabel("Preferências e backup").click();
   await expect(toggle).not.toBeChecked();
   await toggle.check();
   await page.keyboard.press("Escape");
+  await expect.poll(() => page.locator("nav lord-icon").evaluateAll((nodes: any[]) => nodes.some(e => e.player?.playing))).toBe(true);
+});
+
+async function createStudy(page: Page, name: string) {
+  await nav(page, "Estudos");
+  await page
+    .getByRole("button", { name: "Criar primeira trilha", exact: true })
+    .click();
+  await page.getByLabel("O que você quer aprender?").fill(name);
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+}
+test("estudei Spring Cloud funciona sem tarefa diária e sugere o próximo tópico pendente", async ({
+  page,
+}) => {
+  await createStudy(page, "Spring Cloud");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByLabel("Seu comando", { exact: true })
+    .fill("Estudei Spring Cloud");
+  await page
+    .getByRole("button", { name: "Interpretar comando", exact: true })
+    .click();
+  const before = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!),
+  );
+  expect(before.tasks).toHaveLength(0);
   expect(
-    await page
-      .locator("nav .nav-glyph")
-      .evaluateAll(
-        (nodes) =>
-          nodes.flatMap((n) => n.getAnimations({ subtree: true })).length,
-      ),
-  ).toBeGreaterThan(0);
+    before.tracks[0].modules
+      .flatMap((m: any) => m.topics)
+      .filter((t: any) => t.done),
+  ).toHaveLength(0);
+  const confirm = page.getByRole("button", {
+    name: "Confirmar tópico",
+    exact: true,
+  });
+  await expect(confirm).toBeEnabled();
+  await expect(confirm).toBeInViewport();
+  await expect(page.getByLabel("Qual tópico você concluiu?")).toHaveValue(
+    before.tracks[0].modules[0].topics[0].id,
+  );
+  await confirm.click();
+  const after = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("evoluir.data.v1")!),
+  );
+  expect(
+    after.tracks[0].modules
+      .flatMap((m: any) => m.topics)
+      .filter((t: any) => t.done),
+  ).toHaveLength(1);
+  await page.reload();
+  await nav(page, "Estudos");
+  await expect(page.getByText("1 de 25 tópicos concluídos")).toBeVisible();
+});
+test("o áudio capturado de estudo, sem digitação, chega ao interpretador e aguarda confirmação", async ({
+  page,
+}) => {
+  await createStudy(page, "Spring Cloud");
+  await page.evaluate(() => {
+    (window as any).SpeechRecognition = class {
+      onresult: any;
+      onend: any;
+      start() {
+        this.onresult?.({
+          results: [
+            { 0: { transcript: "Estudei Spring Cloud" }, isFinal: true },
+          ],
+        });
+      }
+      stop() {
+        this.onend?.();
+      }
+      abort() {}
+    };
+  });
+  await page
+    .getByRole("button", { name: "Comando de voz", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Falar comando", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Parar e conferir", exact: true })
+    .click();
+  await expect(page.getByLabel("Seu comando", { exact: true })).toHaveValue(
+    "Estudei Spring Cloud",
+  );
+  await expect(
+    page.getByRole("button", { name: "Confirmar tópico", exact: true }),
+  ).toBeEnabled();
+});
+test("aula Java contém explicação, laboratório, diagnóstico e capítulo correto sem carregar todos os roteiros antes", async ({
+  page,
+}) => {
+  const loaded: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("lesson-guides-")) loaded.push(r.url());
+  });
+  await createStudy(page, "Java");
+  expect(loaded).toHaveLength(0);
+  await page
+    .locator("summary")
+    .filter({ hasText: "JDK, JVM e primeiro programa" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Entenda antes de implementar",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Laboratório passo a passo",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Falha para investigar", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/O arquivo .java é compilado em bytecode/),
+  ).toBeVisible();
+  expect(loaded.length).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 320, height: 568 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+});
+test("notícias oculta vistas após reabrir e carrega páginas diferentes sem repetir rastreamento", async ({
+  page,
+}) => {
+  const queries: string[] = [];
+  await page.route("**/api/news*", (route) => {
+    const u = new URL(route.request().url());
+    queries.push(u.search);
+    const second = u.searchParams.get("page") === "1";
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            title: second
+              ? "Segunda publicação sobre Go"
+              : "Primeira publicação sobre Go",
+            url: second
+              ? "https://example.com/go-2"
+              : "https://example.com/go-1?utm_source=rss",
+            source: "Go Blog",
+            category: "Go",
+            publishedAt: "2026-11-01T10:00:00Z",
+          },
+        ],
+        updatedAt: "2026-11-02T12:00:00Z",
+        page: second ? 1 : 0,
+        hasMore: !second,
+        unavailableSources: [],
+      },
+    });
+  });
+  await nav(page, "Notícias");
+  await page
+    .getByRole("button", {
+      name: "Marcar como vista: Primeira publicação sobre Go",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByText("Você já viu estas manchetes")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Carregar mais publicações", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", {
+      name: "Segunda publicação sobre Go",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(queries.some((q) => q.includes("page=1"))).toBe(true);
+  await page.reload();
+  await nav(page, "Notícias");
+  await expect(page.getByText("Você já viu estas manchetes")).toBeVisible();
+  await page.getByLabel("Mostrar vistas").check();
+  await expect(
+    page.getByRole("link", {
+      name: "Primeira publicação sobre Go",
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+test("atualizar notícias pede dados sem cache e informa quando não há manchetes diferentes", async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  await page.route("**/api/news*", (route) => {
+    calls.push(route.request().url());
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            title: "Publicação do projeto",
+            url: "https://example.com/go",
+            source: "Go Blog",
+            category: "Go",
+            publishedAt: "2026-11-01T10:00:00Z",
+          },
+        ],
+        updatedAt: "2026-11-02T12:00:00Z",
+        unavailableSources: [],
+        hasMore: false,
+      },
+    });
+  });
+  await nav(page, "Notícias");
+  await expect(
+    page.getByRole("link", { name: "Publicação do projeto", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Atualizar notícias", exact: true })
+    .click();
+  await expect(
+    page.getByText(/As fontes ainda não publicaram manchetes diferentes/),
+  ).toBeVisible();
+  expect(calls.some((url) => url.includes("fresh=1"))).toBe(true);
+});
+
+test("o roteiro de uma aula permanece disponível offline depois da preparação do PWA", async ({
+  page,
+  context,
+}) => {
+  await createStudy(page, "Java");
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  await context.setOffline(true);
+  await nav(page, "Estudos");
+  await page
+    .locator("summary")
+    .filter({ hasText: "JDK, JVM e primeiro programa" })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Laboratório passo a passo",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await context.setOffline(false);
 });

@@ -13,7 +13,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     return res
       .status(400)
       .json({ error: "O assunto deve ter até 120 caracteres." });
-  const result = await fetchNews(query.data);
+  const page = z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(9)
+    .safeParse(req.query.page ?? 0);
+  const fresh = z.enum(["0", "1"]).safeParse(req.query.fresh ?? "0");
+  if (!page.success || !fresh.success)
+    return res
+      .status(400)
+      .json({ error: "Página ou modo de atualização inválido." });
+  const result = await fetchNews(query.data, page.data);
   if (!result.items.length && result.unavailableSources.length)
     return res.status(503).json({
       error:
@@ -21,7 +32,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
   res.setHeader(
     "Cache-Control",
-    "public, s-maxage=600, stale-while-revalidate=3600",
+    fresh.data === "1"
+      ? "no-store"
+      : "public, s-maxage=60, stale-while-revalidate=120",
   );
   return res.status(200).json(result);
 }

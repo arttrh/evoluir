@@ -1,3 +1,5 @@
+import { AnimatedIcon } from "./components/AnimatedIcon";
+import { LessonGuide } from "./components/LessonGuide";
 import { NewsPage } from "./components/NewsPage";
 import { RunInsights } from "./components/RunInsights";
 import { VoiceCommand } from "./components/VoiceCommand";
@@ -16,9 +18,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Mic,
-  Newspaper,
-  House,
   Footprints,
   BookOpen,
   BriefcaseBusiness,
@@ -72,14 +71,7 @@ import { download, downloadRecovery, useData } from "./store";
 import { createTrack, templateNames } from "./catalog";
 
 type Page = "Hoje" | "Corrida" | "Estudos" | "Emprego" | "Semana" | "Notícias";
-const navigation: [Page, LucideIcon][] = [
-  ["Hoje", House],
-  ["Corrida", Footprints],
-  ["Estudos", BookOpen],
-  ["Emprego", BriefcaseBusiness],
-  ["Semana", CalendarDays],
-  ["Notícias", Newspaper],
-];
+const navigation: Page[] = ["Hoje", "Corrida", "Estudos", "Emprego", "Semana", "Notícias"];
 const areaName: Record<Area, string> = {
   corpo: "Corpo",
   estudos: "Estudos",
@@ -245,6 +237,9 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [jobFilter, setJobFilter] = useState("Todas");
   const [period, setPeriod] = useState<"semana" | "mês">("semana");
+  const [openedTopics, setOpenedTopics] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -1355,7 +1350,7 @@ export default function App() {
               onClick={() => setVoiceOpen(true)}
               aria-label="Comando de voz"
             >
-              <Mic size={20} />
+              <AnimatedIcon name="Voz" size={22} motion={iconMotion} />
             </button>
             {!online && (
               <span className="offline">
@@ -1489,8 +1484,7 @@ export default function App() {
                         : "Salve uma vaga ou planeje uma ação",
                       "Emprego",
                     ],
-                  ].map(([Icon, title, body, sub, target]) => {
-                    const I = Icon as LucideIcon;
+                  ].map(([, title, body, sub, target]) => {
                     return (
                       <button
                         className="pillar"
@@ -1498,7 +1492,7 @@ export default function App() {
                         onClick={() => switchPage(target as Page)}
                       >
                         <span className="pillar-icon">
-                          <I size={22} />
+                          <AnimatedIcon name={target as Page} motion={iconMotion} size={26} />
                         </span>
                         <span>
                           <small>{String(title)}</small>
@@ -1996,6 +1990,14 @@ export default function App() {
                             key={tp.id}
                             id={`topic-${tp.id}`}
                             className="topic"
+                            onToggle={(e) => {
+                              if (e.currentTarget.open)
+                                setOpenedTopics((old) =>
+                                  old.has(tp.id)
+                                    ? old
+                                    : new Set([...old, tp.id]),
+                                );
+                            }}
                             open={undefined}
                           >
                             <summary>
@@ -2008,12 +2010,14 @@ export default function App() {
                               <ChevronRight size={16} />
                             </summary>
                             <div className="topic-content">
-                              <div className="topic-label">Prática</div>
-                              <p>{tp.exercise}</p>
-                              <div className="topic-label">
-                                Critérios de conclusão
-                              </div>
-                              <p>{tp.criteria}</p>
+                              {openedTopics.has(tp.id) && (
+                                <LessonGuide
+                                  course={activeTrack.title}
+                                  title={tp.title}
+                                  exercise={tp.exercise}
+                                  criteria={tp.criteria}
+                                />
+                              )}
                               {tp.resources.length > 0 && (
                                 <div className="topic-label">
                                   Estude nesta ordem
@@ -2560,7 +2564,7 @@ export default function App() {
           {page === "Notícias" && <NewsPage />}
           <footer className="page-footer">
             <span>Dados neste aparelho</span>
-            <span>prumo.</span>
+            <a href="https://lordicon.com/" target="_blank" rel="noopener noreferrer">Ícones animados por Lordicon.com</a>
           </footer>
         </main>
       </div>
@@ -2574,10 +2578,10 @@ export default function App() {
           className="nav-indicator"
           aria-hidden="true"
           style={{
-            transform: `translateX(${navigation.findIndex(([label]) => label === page) * 100}%)`,
+            transform: `translateX(${navigation.indexOf(page) * 100}%)`,
           }}
         />
-        {navigation.map(([label, Icon]) => (
+        {navigation.map((label) => (
           <button
             key={label}
             className={page === label ? "active" : ""}
@@ -2590,7 +2594,7 @@ export default function App() {
               key={page === label ? `${label}-${navPulse}` : label}
               aria-hidden="true"
             >
-              <Icon size={21} strokeWidth={page === label ? 2 : 1.7} />
+              <AnimatedIcon name={label} active={page === label} motion={iconMotion} />
             </span>
             <span>{label}</span>
           </button>

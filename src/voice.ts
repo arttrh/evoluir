@@ -1,9 +1,16 @@
 import { type Task, type Track } from "./model";
+import { templateFor } from "./catalog";
 export const normalize = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(
+      /\bspring[\s-]*(cloud|boot|security|framework|data)\b/g,
+      "spring $1",
+    )
+    .replace(/\bjava[\s-]+script\b/g, "javascript")
+    .replace(/\btype[\s-]+script\b/g, "typescript")
     .replace(/[^a-z0-9\s.,]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -117,6 +124,22 @@ const ignored = new Set([
   "feito",
   "feita",
   "foi",
+  "sobre",
+  "aula",
+  "aulas",
+  "assunto",
+  "curso",
+  "trilha",
+  "ontem",
+  "minuto",
+  "minutos",
+  "min",
+  "hora",
+  "horas",
+  "aprendi",
+  "li",
+  "assisti",
+  "aprender",
 ]);
 function tokens(s: string) {
   return normalize(s)
@@ -127,7 +150,13 @@ function tokens(s: string) {
 export type VoiceIntent =
   | { kind: "run"; distance: number; seconds: number }
   | { kind: "complete"; taskIds: string[]; query: string }
-  | { kind: "study"; topicIds: string[]; query: string }
+  | {
+      kind: "study";
+      topicIds: string[];
+      query: string;
+      suggestedTopicId?: string;
+      courseTitle?: string;
+    }
   | { kind: "unknown"; reason: string };
 export function parseCommand(
   raw: string,
@@ -182,7 +211,7 @@ export function parseCommand(
     };
   }
   if (
-    /\b(terminei|conclui|concluir|finalizei|completei|acabei|marcar|riscar|estudei|enviei|revisei|resolvi|pratiquei|implementei|candidatei|procurei)\b/.test(
+    /\b(terminei|conclui|concluir|finalizei|completei|acabei|marcar|riscar|estudei|aprendi|li|assisti|enviei|revisei|resolvi|pratiquei|implementei|candidatei|procurei)\b/.test(
       value,
     )
   ) {
@@ -199,11 +228,106 @@ export function parseCommand(
     );
     if (found.length)
       return { kind: "complete", taskIds: found.map((t) => t.id), query: raw };
+    const studyTokens = queryTokens.filter((t) => t !== "estudar");
+    const spokenKey = templateFor(raw);
+    const scopes = tracks.filter((track) => {
+      const names = tokens(track.title).filter((t) => t !== "estudar");
+      return (
+        (names.length > 0 && names.every((t) => studyTokens.includes(t))) ||
+        (spokenKey !== "manual" && templateFor(track.title) === spokenKey)
+      );
+    });
+    if (
+      scopes.length &&
+      /\b(estudei|estudar|estudo|aprendi|li|assisti|topico|modulo|terminei|conclui|completei|finalizei|acabei)\b/.test(
+        value,
+      )
+    ) {
+      const exactTopics: string[] = [];
+      const moduleTopics: string[] = [];
+      const referenceTopics: string[] = [];
+      let courseOnly = false;
+      for (const track of scopes) {
+        const key = templateFor(track.title);
+        const scopeWords = new Set([
+          ...tokens(track.title),
+          ...tokens(key),
+          ...(key === "Spring Cloud"
+            ? ["springcloud"]
+            : key === "Spring Boot"
+              ? ["springboot"]
+              : key === "Go"
+                ? ["go", "golang", "golengue", "golink"]
+                : []),
+        ]);
+        const remaining = studyTokens.filter((t) => !scopeWords.has(t));
+        if (!remaining.length) courseOnly = true;
+        for (const module of track.modules) {
+          const moduleWords = tokens(module.title);
+          for (const topic of module.topics) {
+            const words = tokens(topic.title);
+            if (topic.done) continue;
+            if (!remaining.length || remaining.every((t) => words.includes(t)))
+              exactTopics.push(topic.id);
+            else if (
+              remaining.every((t) =>
+                tokens(
+                  topic.resources.map((r) => new URL(r.url).pathname).join(" "),
+                ).includes(t),
+              )
+            )
+              referenceTopics.push(topic.id);
+            else if (remaining.every((t) => moduleWords.includes(t)))
+              moduleTopics.push(topic.id);
+          }
+        }
+      }
+      const selectedTopics = exactTopics.length
+        ? exactTopics
+        : referenceTopics.length
+          ? referenceTopics
+          : moduleTopics;
+      if (selectedTopics.length)
+        return {
+          kind: "study",
+          topicIds: selectedTopics,
+          query: raw,
+          ...(courseOnly && scopes.length === 1
+            ? {
+                suggestedTopicId: selectedTopics[0],
+                courseTitle: scopes[0].title,
+              }
+            : {}),
+        };
+      return {
+        kind: "unknown",
+        reason:
+          "Não há um tópico pendente correspondente nesta trilha. Confira o nome ou consulte as revisões dos tópicos já concluídos.",
+      };
+    }
     const topics = tracks
       .flatMap((t) => t.modules.flatMap((m) => m.topics))
       .filter((t) => !t.done && matches(t.title, true));
     if (topics.length)
       return { kind: "study", topicIds: topics.map((t) => t.id), query: raw };
+    const references = tracks
+      .flatMap((t) => t.modules.flatMap((m) => m.topics))
+      .filter(
+        (topic) =>
+          !topic.done &&
+          studyTokens.length > 0 &&
+          studyTokens.every((word) =>
+            tokens(
+              topic.resources.map((r) => new URL(r.url).pathname).join(" "),
+            ).includes(word),
+          ),
+      );
+    if (references.length)
+      return {
+        kind: "study",
+        topicIds: references.map((t) => t.id),
+        query: raw,
+      };
     return {
       kind: "unknown",
       reason:

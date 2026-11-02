@@ -1,0 +1,11 @@
+Animated icons by Lordicon.com — https://lordicon.com/
+System Outline, free icons individually exported from the Lordicon editor for Prumo.
+Source pages: https://lordicon.com/icons/system/outline/{id-name}
+63-home, 18-location-pin, 4092-book, 187-briefcase, 364-calendar-dots,
+362-article, 188-microphone, 19-magnifier.
+
+Icons remain copyrighted by Lordicon and are not covered by this repository's source-code license.
+These files are included only as assets of this application, not as an icon pack.
+License: https://lordicon.com/docs/license/free
+Attribution: https://lordicon.com/docs/license/attribution
+Do not redistribute these assets independently. Obtain icons and usage rights from Lordicon.

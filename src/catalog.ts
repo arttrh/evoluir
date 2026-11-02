@@ -1,17 +1,11 @@
 import { uid, type Track } from "./model.js";
-import { springCloudModules } from "./study-content.js";
 import { advancedTracks } from "./advanced-content.js";
+import { deepTracks } from "./deep-tracks.js";
 import { readyTracks } from "./ready-content.js";
 const seeds: typeof advancedTracks = {
   ...advancedTracks,
   ...readyTracks,
-  "Spring Cloud": {
-    objective:
-      "Construir um pequeno sistema de serviços com descoberta, gateway e resiliência.",
-    prerequisites:
-      "Java, Spring Boot, REST, testes e configuração de aplicações.",
-    modules: springCloudModules,
-  },
+  ...deepTracks,
 };
 export function templateFor(title: string) {
   const subject = title
@@ -23,8 +17,8 @@ export function templateFor(title: string) {
     ["Python", /\bpython\b/],
     ["React", /\breact\b/],
     ["Node.js", /\bnode(?:\.js|js)?\b/],
-    ["TypeScript", /\btypescript\b/],
-    ["JavaScript", /\bjavascript\b/],
+    ["TypeScript", /\btype[\s-]*script\b/],
+    ["JavaScript", /\bjava[\s-]*script\b/],
     ["Rust", /\brust\b/],
     ["C# / .NET", /c#|c sharp|csharp|\.net|dotnet/],
     ["SQL / PostgreSQL", /\b(sql|postgresql|postgres|mysql)\b/],
@@ -34,6 +28,10 @@ export function templateFor(title: string) {
     [
       "Segurança de aplicações",
       /seguranca|security|owasp|appsec|ciberseguranca/,
+    ],
+    [
+      "Spring Boot",
+      /spring[\s-]*boot|spring[\s-]*framework|spring[\s-]*security/,
     ],
     ["AWS / Cloud", /\b(aws|cloud|nuvem)\b/],
     [
@@ -51,6 +49,11 @@ export function templateFor(title: string) {
   ] as const;
   // Spring Cloud tem prioridade sobre a expressão genérica de nuvem.
   if (/spring[\s-]*cloud/.test(subject)) return "Spring Cloud";
+  if (
+    /\bjava\b/.test(subject) &&
+    /spring[\s-]*(boot|framework|security)/.test(subject)
+  )
+    return "Java";
   return match.find(([, pattern]) => pattern.test(subject))?.[0] || "manual";
 }
 
@@ -94,23 +97,58 @@ export function createTrack(title: string, template: string): Track {
 }
 
 export function expandTrack(track: Track): Track {
+  if (templateFor(track.title) === "manual") return track;
   const full = createTrack(track.title, "auto");
-  const normalize = (s: string) =>
+  const key = (s: string) =>
     s
-      .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
       .replace(/[^a-z0-9]/g, "");
-  const existingTopics = new Set(
-    track.modules.flatMap((m) => m.topics.map((t) => normalize(t.title))),
-  );
-  const modules = full.modules
-    .map((m) => ({
-      ...m,
-      topics: m.topics.filter((t) => !existingTopics.has(normalize(t.title))),
-    }))
-    .filter((m) => m.topics.length);
-  return { ...track, modules: [...track.modules, ...modules] };
+  const moduleKey = (s: string) =>
+    key(
+      s.replace(
+        /^(Básico|Intermediário|Avançado|Projeto final)( opcional)?\s*·\s*/i,
+        "",
+      ),
+    );
+  const oldTopics = track.modules.flatMap((m) => m.topics);
+  const consumed = new Set<string>();
+  const modules = full.modules.map((module) => {
+    const previous = track.modules.find(
+      (m) => moduleKey(m.title) === moduleKey(module.title),
+    );
+    const id = previous?.id || module.id;
+    return {
+      ...module,
+      id,
+      topics: module.topics.map((topic) => {
+        const old = oldTopics.find(
+          (t) => !consumed.has(t.id) && key(t.title) === key(topic.title),
+        );
+        if (!old) return topic;
+        consumed.add(old.id);
+        const resources = [...old.resources];
+        for (const r of topic.resources)
+          if (
+            !resources.some((saved) => saved.url === r.url) &&
+            resources.length < 20
+          )
+            resources.push(r);
+        return { ...old, resources };
+      }),
+    };
+  });
+  for (const oldModule of track.modules) {
+    const topics = oldModule.topics.filter((t) => !consumed.has(t.id));
+    if (!topics.length) continue;
+    const target = modules.find((m) => m.id === oldModule.id);
+    if (target) target.topics.push(...topics);
+    else {
+      modules.push({ ...oldModule, topics });
+    }
+  }
+  return { ...track, modules };
 }
 
 export function hasExpansion(track: Track) {

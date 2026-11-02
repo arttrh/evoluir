@@ -1,6 +1,6 @@
+import { AnimatedIcon } from "./AnimatedIcon";
 import { useState, useMemo } from "react";
 import {
-  Search,
   ArrowUpRight,
   Plus,
   LoaderCircle,
@@ -44,6 +44,11 @@ export function StudyExplorer({
         ? createTrack(searched, "auto")
         : null,
     [searched],
+  );
+  const expansion = useMemo(
+    () =>
+      track && hasExpansion(track) ? createTrack(track.title, "auto") : null,
+    [track],
   );
   async function searchFor(value: string) {
     setQuery(value);
@@ -124,6 +129,35 @@ export function StudyExplorer({
         Escolha um assunto. Receba uma trilha pronta, do básico ao avançado, com
         prática e fontes em cada etapa.
       </p>
+      {track && expansion && (
+        <div className="study-upgrade">
+          <h3>
+            Formação disponível: {expansion.modules.length} módulos ·{" "}
+            {expansion.modules.reduce((n, m) => n + m.topics.length, 0)} aulas
+          </h3>
+          <p>
+            A atualização reorganiza o conteúdo e preserva suas conclusões,
+            revisões e tópicos próprios.
+          </p>
+          <button
+            className="text-button"
+            onClick={() =>
+              onChange(
+                (d) => ({
+                  ...d,
+                  tracks: d.tracks.map((t) =>
+                    t.id === track.id ? expandTrack(t) : t,
+                  ),
+                }),
+                "Trilha ampliada. Seu progresso anterior foi preservado.",
+              )
+            }
+          >
+            <Plus size={16} />
+            Atualizar formação e preservar progresso
+          </button>
+        </div>
+      )}
       <form
         className="study-search"
         onSubmit={(e) => {
@@ -148,7 +182,7 @@ export function StudyExplorer({
           {busy ? (
             <LoaderCircle className="spin" size={17} />
           ) : (
-            <Search size={17} />
+            <AnimatedIcon name="Busca" size={18} />
           )}
           <span>{busy ? "Buscando" : "Buscar fontes"}</span>
         </button>
@@ -190,6 +224,22 @@ export function StudyExplorer({
                 </h3>
               </div>
               <p>{preview.objective}</p>
+              {["Java", "Spring Boot", "Spring Cloud"].includes(
+                templateFor(searched),
+              ) && (
+                <a
+                  className="course-reference"
+                  href="https://www.youtube.com/watch?v=q6z_UCBM5Ek"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Vídeo de apoio · Telusko · cerca de 63 horas
+                  <small>
+                    Os links de cada aula abrem no capítulo de apoio. O roteiro,
+                    o laboratório e os critérios desta formação são próprios.
+                  </small>
+                </a>
+              )}
               <button className="button" onClick={build}>
                 <Plus size={17} />
                 Criar trilha deste assunto
@@ -276,25 +326,6 @@ export function StudyExplorer({
           </span>
           <ArrowUpRight size={17} />
         </a>
-      )}
-      {track && hasExpansion(track) && (
-        <button
-          className="text-button"
-          onClick={() =>
-            onChange(
-              (d) => ({
-                ...d,
-                tracks: d.tracks.map((t) =>
-                  t.id === track.id ? expandTrack(t) : t,
-                ),
-              }),
-              "Trilha ampliada. Seu progresso anterior foi preservado.",
-            )
-          }
-        >
-          <Plus size={16} />
-          Ampliar trilha do básico ao avançado
-        </button>
       )}
     </section>
   );

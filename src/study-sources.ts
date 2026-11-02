@@ -32,11 +32,18 @@ export function officialSources(query: string): StudySource[] {
         ].includes(t),
     );
   const enrich = (t: Track["modules"][number]["topics"][number]) =>
-    t.resources.map((r) => ({
-      ...r,
-      why: `Para ${t.title}: ${r.why}`,
-      kind: "official" as const,
-    }));
+    t.resources
+      .filter(
+        (r) =>
+          !["www.youtube.com", "youtube.com", "youtu.be"].includes(
+            new URL(r.url).hostname,
+          ),
+      )
+      .map((r) => ({
+        ...r,
+        why: `Para ${t.title}: ${r.why}`,
+        kind: "official" as const,
+      }));
   const representative = track.modules.flatMap((m) =>
     m.topics[0] ? enrich(m.topics[0]).slice(0, 1) : [],
   );

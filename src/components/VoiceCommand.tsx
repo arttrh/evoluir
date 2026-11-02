@@ -92,6 +92,13 @@ export function VoiceCommand({
           )
           .filter((t) => intent.topicIds.includes(t.id))
       : [];
+  const studySelected =
+    intent?.kind === "study"
+      ? selected ||
+        intent.suggestedTopicId ||
+        (topics.length === 1 ? topics[0].id : "")
+      : "";
+  const chosenTopic = topics.find((t) => t.id === studySelected);
   function finish() {
     if (disposed.current) return;
     active.current = false;
@@ -225,7 +232,7 @@ export function VoiceCommand({
       )
         close();
     } else if (intent.kind === "study") {
-      const id = selected || (topics.length === 1 ? topics[0].id : "");
+      const id = studySelected;
       if (!id) return;
       if (
         onChange((d) => ({
@@ -415,6 +422,12 @@ export function VoiceCommand({
             </>
           ) : (
             <>
+              {intent.courseTitle && (
+                <p>
+                  Trilha: <strong>{intent.courseTitle}</strong>. O próximo
+                  tópico está sugerido; confira ou escolha outro.
+                </p>
+              )}
               {topics.length === 1 ? (
                 <>
                   <h3>{topics[0].title}</h3>
@@ -424,7 +437,7 @@ export function VoiceCommand({
                 <label className="field">
                   <span>Qual tópico você concluiu?</span>
                   <select
-                    value={selected}
+                    value={studySelected}
                     onChange={(e) => setSelected(e.target.value)}
                   >
                     <option value="">Selecione o tópico</option>
@@ -435,6 +448,11 @@ export function VoiceCommand({
                     ))}
                   </select>
                 </label>
+              )}
+              {topics.length > 1 && chosenTopic && (
+                <p>
+                  <strong>Critério:</strong> {chosenTopic.criteria}
+                </p>
               )}
               <p>
                 Confirme somente se atende aos critérios do tópico. Uma revisão
@@ -453,7 +471,7 @@ export function VoiceCommand({
                   : intent.kind === "study"
                     ? topics.length
                     : 1) > 1 &&
-                  !selected)
+                  !(intent.kind === "study" ? studySelected : selected))
               }
               onClick={apply}
             >

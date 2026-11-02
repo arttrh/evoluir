@@ -2258,35 +2258,6 @@ dialog[open] {
   transform-origin: center;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .bottom-nav .active[data-nav="Hoje"] .nav-glyph {
-    animation: home-arrive 3.8s ease-in-out infinite;
-  }
-  .bottom-nav .active[data-nav="Corrida"] .nav-glyph path:nth-child(odd) {
-    animation: footstep 2.8s ease-in-out infinite;
-  }
-  .bottom-nav .active[data-nav="Corrida"] .nav-glyph path:nth-child(even) {
-    animation: footstep 2.8s 0.18s ease-in-out infinite reverse;
-  }
-  .bottom-nav .active[data-nav="Estudos"] .nav-glyph path:first-child {
-    transform-origin: right center;
-    animation: book-page 4s ease-in-out infinite;
-  }
-  .bottom-nav .active[data-nav="Estudos"] .nav-glyph path:last-child {
-    transform-origin: left center;
-    animation: book-page 4s 0.12s ease-in-out infinite reverse;
-  }
-  .bottom-nav .active[data-nav="Emprego"] .nav-glyph {
-    animation: case-lift 4s ease-in-out infinite;
-  }
-  .bottom-nav .active[data-nav="Semana"] .nav-glyph {
-    animation: calendar-flip 4.2s ease-in-out infinite;
-  }
-  .bottom-nav .active[data-nav="Notícias"] .nav-glyph {
-    animation: paper-turn 4.4s ease-in-out infinite;
-  }
-  .bottom-nav button:hover .nav-glyph {
-    filter: drop-shadow(0 2px 2px #735b341c);
-  }
   .week-days button {
     transition:
       background-color 0.2s,
@@ -2295,91 +2266,6 @@ dialog[open] {
   }
   .week-days button.selected {
     box-shadow: 0 4px 16px #54452c15;
-  }
-}
-@keyframes home-arrive {
-  0%,
-  22%,
-  100% {
-    transform: translateY(0) rotate(0);
-  }
-  7% {
-    transform: translateY(-3px) rotate(-5deg);
-  }
-  14% {
-    transform: translateY(0) rotate(3deg);
-  }
-}
-@keyframes footstep {
-  0%,
-  28%,
-  100% {
-    transform: translateY(0) rotate(0);
-  }
-  10% {
-    transform: translateY(-3px) rotate(-12deg);
-  }
-  20% {
-    transform: translateY(1px) rotate(4deg);
-  }
-}
-@keyframes book-page {
-  0%,
-  25%,
-  100% {
-    transform: scaleX(1) rotate(0);
-  }
-  10% {
-    transform: scaleX(0.82) rotate(-7deg);
-  }
-  18% {
-    transform: scaleX(1) rotate(2deg);
-  }
-}
-@keyframes case-lift {
-  0%,
-  25%,
-  100% {
-    transform: translateY(0) rotate(0);
-  }
-  8% {
-    transform: translateY(-3px) rotate(-6deg);
-  }
-  16% {
-    transform: translateY(-1px) rotate(4deg);
-  }
-}
-@keyframes calendar-flip {
-  0%,
-  26%,
-  100% {
-    transform: perspective(90px) rotateX(0);
-  }
-  10% {
-    transform: perspective(90px) rotateX(20deg) translateY(-2px);
-  }
-  18% {
-    transform: perspective(90px) rotateX(-8deg);
-  }
-}
-@keyframes paper-turn {
-  0%,
-  26%,
-  100% {
-    transform: rotate(0) translateY(0);
-  }
-  9% {
-    transform: rotate(-9deg) translateY(-2px);
-  }
-  18% {
-    transform: rotate(4deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nav-glyph,
-  .nav-glyph svg path {
-    animation: none !important;
-    transform: none !important;
   }
 }
 .news-categories {
@@ -2421,3 +2307,157 @@ dialog[open] {
   animation: none !important;
   transform: none !important;
 }
+.lesson-guide {
+  margin-bottom: 22px;
+  padding: 20px 0;
+  border-top: 1px solid #e7dfd3;
+  border-bottom: 1px solid #e7dfd3;
+}
+.lesson-meta {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: #78674e;
+  margin-bottom: 18px;
+}
+.lesson-guide h4 {
+  font-size: 14px;
+  color: #292722;
+  margin: 20px 0 10px;
+}
+.lesson-guide p,
+.lesson-guide li {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #514b42;
+}
+.lesson-guide p {
+  margin-bottom: 13px;
+}
+.lesson-guide ol {
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+.lesson-guide pre {
+  overflow: auto;
+  background: #272622;
+  color: #f9f6ef;
+  border-radius: 12px;
+  padding: 16px;
+  font:
+    12px/1.8 ui-monospace,
+    monospace;
+}
+.lesson-pitfall {
+  padding: 1px 15px 3px;
+  margin-top: 18px;
+  border-left: 3px solid #a48a64;
+  background: #eee7d852;
+  border-radius: 0 12px 12px 0;
+}
+.lesson-project {
+  padding: 12px 14px;
+  background: #ece6dc55;
+  border-radius: 10px;
+}
+.news-reading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #6d6253;
+  margin-bottom: 20px;
+}
+.news-reading label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.news-reading input {
+  width: 18px;
+  height: 18px;
+  accent-color: #302b23;
+}
+.news-more {
+  margin: 25px auto 10px;
+}
+.news-card-footer > .icon-button {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+.news-card-footer {
+  gap: 8px;
+}
+.news-card-footer > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.news-card-footer > .icon-button {
+  flex-shrink: 0;
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+.study-upgrade {
+  padding: 18px;
+  margin: 18px 0;
+  background: #eee6d65e;
+  border: 1px solid #ded3bf;
+  border-radius: 16px;
+}
+.study-upgrade h3 {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.study-upgrade p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #675c4b;
+  margin: 8px 0;
+}
+.course-reference {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 12px 0 18px;
+  color: #70583a;
+}
+.course-reference small {
+  display: block;
+  color: #706858;
+  font-size: 11px;
+}
+.news-reading {
+  gap: 8px;
+}
+.news-reading > span {
+  white-space: nowrap;
+}
+.news-reading > label {
+  white-space: nowrap;
+}
+.news-reading > .text-button {
+  font-size: 11px;
+  min-height: 44px;
+}
+
+.app-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 0;
+  vertical-align: middle;
+}
+.app-icon img { display: block; width: 100%; height: 100%; }
+.page-footer a { color: inherit; text-decoration: none; }
+.page-footer a:hover { text-decoration: underline; }
+.page-footer a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }

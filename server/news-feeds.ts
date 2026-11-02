@@ -4,6 +4,7 @@ import {
   newsItemSchema,
   normalizeNewsQuery,
   newsSearchTerms,
+  newsKey,
   type NewsItem,
 } from "../src/news.js";
 export const newsFeeds = [
@@ -152,6 +153,7 @@ export async function readBounded(response: Response) {
 }
 
 const hnSchema = z.object({
+  nbPages: z.number().int().optional(),
   hits: z
     .array(
       z.object({
@@ -163,12 +165,16 @@ const hnSchema = z.object({
     )
     .max(50),
 });
-async function searchHeadlines(query: string): Promise<NewsItem[]> {
+async function searchHeadlines(
+  query: string,
+  page: number,
+): Promise<{ items: NewsItem[]; hasMore: boolean }> {
   const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
   url.search = new URLSearchParams({
     query: normalizeNewsQuery(query),
     tags: "story",
     hitsPerPage: "30",
+    page: String(page),
     restrictSearchableAttributes: "title,url",
     numericFilters: "points>2",
   }).toString();
@@ -178,7 +184,7 @@ async function searchHeadlines(query: string): Promise<NewsItem[]> {
   });
   if (!response.ok) throw new Error("Busca indisponível.");
   const result = hnSchema.parse(JSON.parse(await readBounded(response)));
-  return result.hits.flatMap((hit) => {
+  const items = result.hits.flatMap((hit) => {
     const parsed = newsItemSchema.safeParse({
       title: hit.title,
       url:
@@ -187,12 +193,20 @@ async function searchHeadlines(query: string): Promise<NewsItem[]> {
       source: "Hacker News · comunidade",
       category: "Tecnologia",
       publishedAt: hit.created_at,
+      dateKind: "shared",
     });
     return parsed.success &&
       new Date(parsed.data.publishedAt).getTime() <= Date.now() + 86400000
       ? [parsed.data]
       : [];
   });
+  return {
+    items,
+    hasMore:
+      result.nbPages !== undefined
+        ? page + 1 < result.nbPages
+        : result.hits.length === 30,
+  };
 }
 function matchesQuery(item: NewsItem, query: string) {
   const q = normalizeNewsQuery(query);
@@ -212,7 +226,7 @@ function matchesQuery(item: NewsItem, query: string) {
     return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:$|[^a-z0-9])`).test(text);
   });
 }
-export async function fetchNews(query = "") {
+export async function fetchNews(query = "", page = 0) {
   const normalized = normalizeNewsQuery(query);
   const feeds = normalized
     ? newsFeeds.filter((feed) =>
@@ -228,43 +242,61 @@ export async function fetchNews(query = "") {
         ),
       )
     : newsFeeds;
-  const jobs: { name: string; load: () => Promise<NewsItem[]> }[] = feeds.map(
-    (feed) => ({
-      name: feed.name,
-      load: async () => {
-        const r = await fetch(feed.url, {
-          redirect: "error",
-          signal: AbortSignal.timeout(6500),
-          headers: {
-            Accept:
-              "application/atom+xml, application/rss+xml, application/xml, text/xml",
-          },
-        });
-        if (!r.ok) throw new Error("Fonte indisponível.");
-        return parseNewsFeed(await readBounded(r), feed);
-      },
-    }),
-  );
-  if (normalized)
-    jobs.push({ name: "Hacker News", load: () => searchHeadlines(normalized) });
+  const jobs: {
+    name: string;
+    load: () => Promise<{ items: NewsItem[]; hasMore: boolean }>;
+  }[] = feeds.map((feed) => ({
+    name: feed.name,
+    load: async () => {
+      const r = await fetch(feed.url, {
+        redirect: "error",
+        signal: AbortSignal.timeout(6500),
+        headers: {
+          Accept:
+            "application/atom+xml, application/rss+xml, application/xml, text/xml",
+        },
+      });
+      if (!r.ok) throw new Error("Fonte indisponível.");
+      const all = parseNewsFeed(await readBounded(r), feed).filter((item) =>
+        matchesQuery(item, normalized),
+      );
+      return {
+        items: all.slice(page * 3, (page + 1) * 3),
+        hasMore: all.length > (page + 1) * 3,
+      };
+    },
+  }));
+  jobs.push({
+    name: "Hacker News",
+    load: () => searchHeadlines(normalized, page),
+  });
   const result = await Promise.allSettled(jobs.map((job) => job.load()));
   const items: NewsItem[] = [];
   const unavailableSources: string[] = [];
+  let hasMore = false;
   result.forEach((r, i) => {
-    if (r.status === "fulfilled") items.push(...r.value);
-    else unavailableSources.push(jobs[i].name);
+    if (r.status === "fulfilled") {
+      items.push(...r.value.items);
+      hasMore ||= r.value.hasMore;
+    } else unavailableSources.push(jobs[i].name);
   });
   const urls = new Set<string>();
+  const titles = new Set<string>();
   return {
     items: items
       .filter((i) => matchesQuery(i, normalized))
       .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
       .filter((item) => {
-        if (urls.has(item.url)) return false;
-        urls.add(item.url);
+        const key = newsKey(item.url),
+          title = normalizeNewsQuery(item.title).replace(/[^a-z0-9]/g, "");
+        if (urls.has(key) || titles.has(title)) return false;
+        urls.add(key);
+        titles.add(title);
         return true;
       })
       .slice(0, 60),
+    page,
+    hasMore: page < 9 && hasMore,
     updatedAt: new Date().toISOString(),
     unavailableSources,
   };

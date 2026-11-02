@@ -194,7 +194,7 @@ describe("integridade dos registros", () => {
 
 describe("objetivo de estudo", () => {
   it.each([
-    ["Quero melhorar Java", "coleções"],
+    ["Quero melhorar Java", "JDK"],
     ["Quero estudar Spring Cloud", "Configurar"],
     ["Quero aprender Docker", "containers"],
     ["Quero aprender arquitetura de software", "Qualidades"],
