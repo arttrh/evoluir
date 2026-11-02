@@ -551,6 +551,16 @@ test("Strava exibe métricas autenticadas sem persistir atividades em backup", a
   expect(
     await page.evaluate(() => localStorage.getItem("evoluir.data.v1")),
   ).toBeNull();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect(
+    page.getByRole("heading", { name: "Corrida externa de teste" }),
+  ).not.toBeVisible();
   await nav(page, "Hoje");
   await nav(page, "Corrida");
   await expect(

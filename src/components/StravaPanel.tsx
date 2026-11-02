@@ -51,6 +51,17 @@ export function StravaPanel() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    const clear = () => {
+      if (document.visibilityState === "hidden") setActivities([]);
+    };
+    document.addEventListener("visibilitychange", clear);
+    const expiry = setInterval(() => setActivities([]), 300000);
+    return () => {
+      document.removeEventListener("visibilitychange", clear);
+      clearInterval(expiry);
+    };
+  }, []);
   async function load() {
     setBusy(true);
     setError("");
@@ -70,7 +81,8 @@ export function StravaPanel() {
             : "Falha ao consultar atividades.",
         );
       }
-      setActivities(responseSchema.parse(await response.json()).activities);
+      const data = responseSchema.parse(await response.json());
+      if (document.visibilityState !== "hidden") setActivities(data.activities);
     } catch (e) {
       setActivities([]);
       setError(e instanceof Error ? e.message : "Não foi possível consultar.");
