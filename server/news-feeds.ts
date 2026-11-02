@@ -1,3 +1,5 @@
+import { readBounded } from "./http.js";
+export { readBounded } from "./http.js";
 import { z } from "zod";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import {
@@ -124,32 +126,6 @@ export function parseNewsFeed(xml: string, feed: Feed): NewsItem[] {
     if (result.success) output.push(result.data);
   }
   return output;
-}
-export async function readBounded(response: Response) {
-  if (Number(response.headers.get("content-length")) > 2_000_000)
-    throw new Error("Feed muito grande.");
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("Feed vazio.");
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.length;
-      if (length > 2_000_000) throw new Error("Feed muito grande.");
-      chunks.push(value);
-    }
-  } finally {
-    await reader.cancel();
-  }
-  const body = new Uint8Array(length);
-  let offset = 0;
-  for (const part of chunks) {
-    body.set(part, offset);
-    offset += part.length;
-  }
-  return new TextDecoder().decode(body);
 }
 
 const hnSchema = z.object({

@@ -1,3 +1,4 @@
+import { forwardToJava } from "../server/java-backend.js";
 import type {
   ApiRequest as VercelRequest,
   ApiResponse as VercelResponse,
@@ -50,6 +51,7 @@ async function tokenRequest(params: Record<string, string>) {
   return tokenSchema.parse(await response.json());
 }
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (await forwardToJava(req, res, "/api/strava")) return;
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Vary", "Cookie");
   const parsed = configSchema.safeParse({

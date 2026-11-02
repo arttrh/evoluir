@@ -12,6 +12,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Conferir catálogo compartilhado com Java
+        run: |
+          node scripts/export-java-catalog.mjs
+          git diff --exit-code -- backend/src/main/resources/catalog.json
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
@@ -21,3 +25,20 @@ jobs:
         with:
           name: evidencias-playwright
           path: test-results/
+
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - run: mvn -B -f backend/pom.xml verify
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: evidencias-java
+          path: backend/target/surefire-reports/

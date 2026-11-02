@@ -1,3 +1,4 @@
+import { readBounded } from "./http.js";
 import { z } from "zod";
 import { jobSearchSchema, vacanciesSchema, vacancySchema, type JobSearch } from "../src/jobs.js";
 
@@ -37,8 +38,7 @@ export async function searchJobs(input: JobSearch) {
     redirect: "error",
   });
   if (!response.ok) throw new Error("Busca de vagas indisponível.");
-  const raw = await response.text();
-  if (raw.length > 3_000_000) throw new Error("Resposta de vagas muito grande.");
+  const raw = await readBounded(response, 3_000_000);
   const result = z.object({
     items: z.array(z.unknown()).max(30),
     total_count: z.number().int().nonnegative(),

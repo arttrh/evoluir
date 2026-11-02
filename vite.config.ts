@@ -56,6 +56,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   for (const key of [
     "APP_ORIGIN",
+    "JAVA_BACKEND_URL",
+    "JAVA_BACKEND_KEY",
     "STRAVA_CLIENT_ID",
     "STRAVA_CLIENT_SECRET",
     "STRAVA_SESSION_SECRET",

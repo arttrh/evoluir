@@ -1,8 +1,10 @@
+import { forwardToJava } from "../server/java-backend.js";
 import type { ApiRequest, ApiResponse } from "../server/http.js";
 import { jobSearchSchema } from "../src/jobs.js";
 import { searchJobs } from "../server/job-search.js";
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (await forwardToJava(req, res, "/api/jobs")) return;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Método não permitido." });

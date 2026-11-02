@@ -25,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-O servidor de desenvolvimento atende também `/api/study-search` e `/api/strava`, além de `/api/news`, usando os mesmos handlers da Vercel. Sem credenciais Strava, o aplicativo informa que a conexão ainda não está ativada. Buscas online dependem da disponibilidade e quota do Stack Exchange; o catálogo oficial é o fallback.
+O servidor de desenvolvimento atende também `/api/study-search` e `/api/strava`, além de `/api/news` e `/api/jobs`, usando os mesmos handlers da Vercel. Sem credenciais Strava, o aplicativo informa que a conexão ainda não está ativada. Buscas online dependem da disponibilidade e quota do Stack Exchange; o catálogo oficial é o fallback.
 
 ```sh
 npm test
@@ -86,3 +86,7 @@ Trilhas antigas oferecem **Atualizar formação e preservar progresso**. A atual
 A lista inicial combina lotes de até três publicações por feed e manchetes da comunidade; a próxima página consulta outras publicações e outra página do Hacker News. Links são deduplicados sem parâmetros de rastreamento. Abrir uma notícia ou marcá-la como vista salva apenas seu identificador localmente. “Já vi lote” permite ocultar o lote inteiro. “Mostrar vistas” volta a exibi-lo. O histórico de leitura fica separado do backup pessoal.
 
 Atualização manual usa `fresh=1`, resposta `no-store` e uma nova consulta às fontes. Consultas normais usam cache curto. Quando os mesmos artigos retornam, a tela informa ausência de manchetes diferentes; não inventa nem redistribui aleatoriamente notícias antigas como se fossem novas. As fontes podem não ter publicado algo novo. No Hacker News, a data representa compartilhamento; nos feeds, publicação.
+
+## Backend Java
+
+A migração para Java 21/Spring Boot 4.1.2 tem implementação das quatro APIs, testes, Docker e CI. A ativação depende de hospedagem Java e configuração somente no servidor. O site continua na Vercel e conserva autenticação, domínio e dados locais. Consulte [instruções e estado da migração](backend/README.md).

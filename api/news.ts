@@ -1,7 +1,9 @@
+import { forwardToJava } from "../server/java-backend.js";
 import type { ApiRequest, ApiResponse } from "../server/http.js";
 import { z } from "zod";
 import { fetchNews } from "../server/news-feeds.js";
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (await forwardToJava(req, res, "/api/news")) return;
   if (req.method !== "GET")
     return res.status(405).json({ error: "Método não permitido." });
   const query = z

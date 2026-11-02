@@ -7,46 +7,47 @@ const seeds: typeof advancedTracks = {
   ...readyTracks,
   ...deepTracks,
 };
+export const templateMatchers = [
+  ["Go", /\b(go|golang|golengue|golink)\b|go lang/],
+  ["Python", /\bpython\b/],
+  ["React", /\breact\b/],
+  ["Node.js", /\bnode(?:\.js|js)?\b/],
+  ["TypeScript", /\btype[\s-]*script\b/],
+  ["JavaScript", /\bjava[\s-]*script\b/],
+  ["Rust", /\brust\b/],
+  ["C# / .NET", /c#|c sharp|csharp|\.net|dotnet/],
+  ["SQL / PostgreSQL", /\b(sql|postgresql|postgres|mysql)\b/],
+  ["Git", /\bgit\b/],
+  ["Linux", /\blinux\b/],
+  ["Kubernetes", /\b(kubernetes|k8s)\b/],
+  [
+    "Segurança de aplicações",
+    /seguranca|security|owasp|appsec|ciberseguranca/,
+  ],
+  [
+    "Spring Boot",
+    /spring[\s-]*boot|spring[\s-]*framework|spring[\s-]*security/,
+  ],
+  ["AWS / Cloud", /\b(aws|cloud|nuvem)\b/],
+  [
+    "System Design",
+    /system[\s-]*design|projeto de sistemas|sistemas distribuidos/,
+  ],
+  [
+    "Arquitetura de software",
+    /arquitetura|software architect|clean architecture|hexagonal/,
+  ],
+  ["Spring Cloud", /spring[\s-]*cloud/],
+  ["Docker", /\bdocker\b/],
+  ["Java", /\bjava\b/],
+  ["Backend", /back[\s-]*end/],
+] as const;
 export function templateFor(title: string) {
   const subject = title
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  const match = [
-    ["Go", /\b(go|golang|golengue|golink)\b|go lang/],
-    ["Python", /\bpython\b/],
-    ["React", /\breact\b/],
-    ["Node.js", /\bnode(?:\.js|js)?\b/],
-    ["TypeScript", /\btype[\s-]*script\b/],
-    ["JavaScript", /\bjava[\s-]*script\b/],
-    ["Rust", /\brust\b/],
-    ["C# / .NET", /c#|c sharp|csharp|\.net|dotnet/],
-    ["SQL / PostgreSQL", /\b(sql|postgresql|postgres|mysql)\b/],
-    ["Git", /\bgit\b/],
-    ["Linux", /\blinux\b/],
-    ["Kubernetes", /\b(kubernetes|k8s)\b/],
-    [
-      "Segurança de aplicações",
-      /seguranca|security|owasp|appsec|ciberseguranca/,
-    ],
-    [
-      "Spring Boot",
-      /spring[\s-]*boot|spring[\s-]*framework|spring[\s-]*security/,
-    ],
-    ["AWS / Cloud", /\b(aws|cloud|nuvem)\b/],
-    [
-      "System Design",
-      /system[\s-]*design|projeto de sistemas|sistemas distribuidos/,
-    ],
-    [
-      "Arquitetura de software",
-      /arquitetura|software architect|clean architecture|hexagonal/,
-    ],
-    ["Spring Cloud", /spring[\s-]*cloud/],
-    ["Docker", /\bdocker\b/],
-    ["Java", /\bjava\b/],
-    ["Backend", /back[\s-]*end/],
-  ] as const;
+
   // Spring Cloud tem prioridade sobre a expressão genérica de nuvem.
   if (/spring[\s-]*cloud/.test(subject)) return "Spring Cloud";
   if (
@@ -54,7 +55,7 @@ export function templateFor(title: string) {
     /spring[\s-]*(boot|framework|security)/.test(subject)
   )
     return "Java";
-  return match.find(([, pattern]) => pattern.test(subject))?.[0] || "manual";
+  return templateMatchers.find(([, pattern]) => pattern.test(subject))?.[0] || "manual";
 }
 
 export const templateNames = Object.keys(seeds);

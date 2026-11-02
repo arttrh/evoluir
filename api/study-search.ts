@@ -1,3 +1,4 @@
+import { forwardToJava } from "../server/java-backend.js";
 import type {
   ApiRequest as VercelRequest,
   ApiResponse as VercelResponse,
@@ -18,6 +19,7 @@ const upstream = z.object({
   error_id: z.number().optional(),
 });
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (await forwardToJava(req, res, "/api/study-search")) return;
   if (req.method !== "GET")
     return res.status(405).json({ error: "Método não permitido." });
   const query = z.string().trim().min(2).max(120).safeParse(req.query.q);
