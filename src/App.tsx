@@ -5,6 +5,7 @@ import { NewsPage } from "./components/NewsPage";
 import { RunInsights } from "./components/RunInsights";
 import { VoiceCommand } from "./components/VoiceCommand";
 import { StudyExplorer } from "./components/StudyExplorer";
+import { LearnHarnessPanel } from "./components/LearnHarnessPanel";
 import { StravaPanel } from "./components/StravaPanel";
 import { usePageMotion } from "./motion";
 import {
@@ -1766,6 +1767,7 @@ export default function App() {
           )}
           {page === "Estudos" && (
             <>
+              <LearnHarnessPanel tracks={data.tracks} />
               <StudyExplorer
                 track={activeTrack}
                 onChange={change}

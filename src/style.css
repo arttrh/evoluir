@@ -2503,3 +2503,11 @@ dialog[open] {
 .job-search-result .job-actions {
   flex-wrap: wrap;
 }
+.learning-panel { margin-bottom: 24px; }
+.learning-panel > .button { margin: 12px 0; }
+.learning-panel .section-heading { flex-wrap: wrap; gap: 12px; }
+.learning-session { border-top: 1px solid var(--line, #dedbd3); padding-top: 20px; overflow-wrap: anywhere; min-width: 0; }
+.learning-session select { width: 100%; min-width: 0; }
+.learning-session ul { padding-left: 20px; }
+.learning-session li { margin: 8px 0; }
+.learning-session li small { display: inline-block; margin-left: 8px; color: var(--muted, #68665e); }

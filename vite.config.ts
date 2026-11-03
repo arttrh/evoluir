@@ -9,12 +9,13 @@ import search from "./api/study-search.js";
 import strava from "./api/strava.js";
 import news from "./api/news.js";
 import jobs from "./api/jobs.js";
+import learning from "./api/learning.js";
 import type { ApiRequest, ApiResponse } from "./server/http.js";
 function localApi(server: ViteDevServer | PreviewServer) {
   server.middlewares.use(async (req, res, next) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (
-      !["/api/study-search", "/api/strava", "/api/news", "/api/jobs"].includes(url.pathname)
+      !["/api/study-search", "/api/strava", "/api/news", "/api/jobs", "/api/learning"].includes(url.pathname)
     )
       return next();
     const request = req as ApiRequest;
@@ -37,7 +38,9 @@ function localApi(server: ViteDevServer | PreviewServer) {
     };
     try {
       await (
-        url.pathname === "/api/jobs"
+        url.pathname === "/api/learning"
+          ? learning
+          : url.pathname === "/api/jobs"
           ? jobs
           : url.pathname === "/api/strava"
           ? strava
@@ -58,6 +61,9 @@ export default defineConfig(({ mode }) => {
     "APP_ORIGIN",
     "JAVA_BACKEND_URL",
     "JAVA_BACKEND_KEY",
+    "LEARNHARNESS_URL",
+    "PRUMO_STORE_URL",
+    "PRUMO_GATEWAY_KEY",
     "STRAVA_CLIENT_ID",
     "STRAVA_CLIENT_SECRET",
     "STRAVA_SESSION_SECRET",
