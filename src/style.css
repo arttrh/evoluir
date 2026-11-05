@@ -2522,3 +2522,16 @@ dialog[open] {
 .news-page .news-categories button { font-size: 12px; min-height: 44px; }
 
 .news-page .news-card-meta { color: #6b5c48; }
+
+.study-source-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.study-source-filters button { min-height: 44px; padding: 10px 14px; border-radius: 8px; background: #eeebe4; color: #403c35; font-size: 13px; }
+.study-source-filters button[aria-pressed="true"] { background: #292722; color: white; }
+.study-search-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.study-search-links a { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid #ddd7cd; border-radius: 8px; font-size: 13px; }
+.source-result .source-kind { line-height: 1.5; overflow-wrap: anywhere; }
+
+.study-explorer .source-kind { font-size: 12px; text-transform: none; letter-spacing: 0; }
+.study-explorer .source-result strong { font-size: 15px; }
+.study-explorer .source-result > span:last-child { font-size: 13px; }
+.study-preview-modules summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 13px; }
+.study-preview-modules p { font-size: 13px; margin: 12px 0; }

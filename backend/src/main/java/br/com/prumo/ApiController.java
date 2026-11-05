@@ -14,9 +14,9 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 @RestController
 public class ApiController {
     private final JobsService jobs;
-    private final StudyService study;
+    private final StudySearchService study;
     private final NewsService news;
-    public ApiController(JobsService jobs, StudyService study, NewsService news) { this.jobs = jobs; this.study = study; this.news = news; }
+    public ApiController(JobsService jobs, StudySearchService study, NewsService news) { this.jobs = jobs; this.study = study; this.news = news; }
     @GetMapping("/api/news")
     public ResponseEntity<?> news(@RequestParam MultiValueMap<String, String> parameters) {
         String query = Api.parameter(parameters, "q", "", 120);

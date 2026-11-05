@@ -6,11 +6,49 @@ export const studySourceSchema = z.object({
   title: z.string().min(1).max(500),
   url: safeUrl,
   why: z.string().max(2000),
-  kind: z.enum(["official", "community", "roadmap"]),
+  kind: z.enum(["official", "article", "community", "roadmap"]),
+  publisher: z.string().max(100).optional(),
 });
 export type StudySource = z.infer<typeof studySourceSchema>;
+export const studyProviders = [
+  { name: "Stack Overflow", kind: "community", format: "stack", host: "stackoverflow.com", url: "https://api.stackexchange.com/2.3/search/advanced?site=stackoverflow&q={query}&pagesize=5&order=desc&sort=relevance&accepted=true&closed=false" },
+  { name: "Baeldung", kind: "article", format: "feed", host: "baeldung.com", url: "https://www.baeldung.com/?s={query}&feed=rss2&orderby=relevance" },
+  { name: "Medium", kind: "article", format: "feed", host: "", focusUrl: "https://medium.com/feed/tag/{focus}", url: "https://medium.com/feed/tag/{tag}" },
+  { name: "DEV Community", kind: "article", format: "dev", host: "dev.to", focusUrl: "https://dev.to/api/articles?tag={focus}&per_page=30", url: "https://dev.to/api/articles?tag={devtag}&per_page=30" },
+  { name: "Reddit", kind: "community", format: "feed", host: "reddit.com", url: "https://www.reddit.com/search.rss?q={query}&sort=relevance&limit=25" },
+  { name: "Hacker News", kind: "community", format: "hn", host: "news.ycombinator.com", url: "https://hn.algolia.com/api/v1/search?query={query}&tags=story&hitsPerPage=5" },
+] as const;
+export const studyTags: Record<string, string> = {
+  "Java": "java", "Spring Boot": "spring-boot", "Spring Cloud": "spring-cloud", "Go": "golang", "Python": "python",
+  "JavaScript": "javascript", "TypeScript": "typescript", "React": "react", "Node.js": "nodejs", "Rust": "rust", "C# / .NET": "dotnet",
+  "SQL / PostgreSQL": "postgresql", "Git": "git", "Linux": "linux", "Docker": "docker", "Kubernetes": "kubernetes",
+  "Segurança de aplicações": "security", "AWS / Cloud": "aws", "System Design": "system-design", "Arquitetura de software": "software-architecture", "Backend": "backend",
+};
+export function studyQuery(query: string) {
+  if (/^spring$/i.test(query.trim())) return "Spring Framework";
+  return templateFor(query) === "Go" ? query.replace(/\b(golang|golengue|golink|go(?:\s+lang)?)\b/gi, "golang") : query;
+}
+export function studyTag(query: string) {
+  return studyTags[templateFor(studyQuery(query))] || query.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+export function sourcePublisher(source: StudySource) {
+  return source.publisher || new URL(source.url).hostname.replace(/^www\./, "");
+}
+export function studySearchLinks(query: string) {
+  const q=encodeURIComponent(studyQuery(query));
+  return [
+    {title:"Documentação oficial na web",url:`https://www.google.com/search?q=${q}+official+documentation`},
+    {title:"Spring",url:`https://www.google.com/search?q=site%3Aspring.io+${q}`},
+    {title:"Baeldung",url:`https://www.baeldung.com/?s=${q}`},
+    {title:"Medium",url:`https://medium.com/search?q=${q}`},
+    {title:"Reddit",url:`https://www.reddit.com/search/?q=${q}`},
+    {title:"DEV Community",url:`https://dev.to/search?q=${q}`},
+    {title:"Stack Overflow",url:`https://stackoverflow.com/search?q=${q}`},
+    {title:"Hacker News",url:`https://hn.algolia.com/?q=${q}`},
+  ].filter(link => link.title !== "Spring" || /spring|java/i.test(query));
+}
 export function officialSources(query: string): StudySource[] {
-  const track = createTrack(query, "auto");
+  const track = createTrack(studyQuery(query), "auto");
   const normalize = (s: string) =>
     s
       .toLowerCase()

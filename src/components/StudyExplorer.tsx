@@ -1,5 +1,6 @@
+import { fetchCloud } from "../cloud";
 import { AnimatedIcon } from "./AnimatedIcon";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   ArrowUpRight,
   Plus,
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 import {
   officialSources,
+  sourcePublisher,
+  studySearchLinks,
   roadmapFor,
   studySourceSchema,
   topicModule,
@@ -38,6 +41,13 @@ export function StudyExplorer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState("");
+  const [checkedAt, setCheckedAt] = useState("");
+  const [kind, setKind] = useState("all");
+  const controller = useRef<AbortController | null>(null);
+  useEffect(() => () => controller.current?.abort(), []);
+  const visibleSources = sources.filter(source => kind === "all" || source.kind === kind);
+  const sourceLabels = { official: "Documentação oficial", article: "Artigo / tutorial", community: "Discussão", roadmap: "Roteiro" };
+
   const preview = useMemo(
     () =>
       searched && templateFor(searched) !== "manual"
@@ -51,6 +61,11 @@ export function StudyExplorer({
     [track],
   );
   async function searchFor(value: string) {
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    setKind("all");
+    setCheckedAt("");
     setQuery(value);
     setTopics("");
     setBusy(true);
@@ -58,25 +73,25 @@ export function StudyExplorer({
     setSources([]);
     setSearched("");
     try {
-      const response = await fetch(
-        `/api/study-search?q=${encodeURIComponent(value.trim())}`,
-        { signal: AbortSignal.timeout(10000) },
-      );
+      const response = await fetchCloud(`/api/study-search?q=${encodeURIComponent(value.trim())}`, abort.signal);
       if (!response.ok) throw new Error();
       const result = z
-        .object({ sources: z.array(studySourceSchema), warning: z.string() })
+        .object({ sources: z.array(studySourceSchema).max(80), warning: z.string(), searchedAt: z.iso.datetime().optional() })
         .parse(await response.json());
+      if (abort.signal.aborted) return;
+      setCheckedAt(result.searchedAt || "");
       setSources(result.sources);
       setError(result.warning);
       setSearched(value.trim());
     } catch {
+      if (abort.signal.aborted) return;
       setSources(officialSources(value));
       setSearched(value.trim());
       setError(
         "Sem resposta da busca online. Mostrando apenas o catálogo oficial disponível no aplicativo.",
       );
     } finally {
-      setBusy(false);
+      if (!abort.signal.aborted) setBusy(false);
     }
   }
   function build() {
@@ -126,8 +141,8 @@ export function StudyExplorer({
         </span>
       </div>
       <p className="muted small">
-        Escolha um assunto. Receba uma trilha pronta, do básico ao avançado, com
-        prática e fontes em cada etapa.
+        Pesquise uma tecnologia ou dúvida específica. Consulte documentação,
+        artigos e discussões; use as trilhas disponíveis para organizar sua prática.
       </p>
       {track && expansion && (
         <div className="study-upgrade">
@@ -187,6 +202,7 @@ export function StudyExplorer({
           <span>{busy ? "Buscando" : "Buscar fontes"}</span>
         </button>
       </form>
+      {busy && <p role="status" className="muted small">Consultando documentação, artigos e comunidades… O servidor gratuito pode levar um minuto para iniciar.</p>}
       <datalist id="study-subjects">
         {templateNames.map((name) => (
           <option key={name} value={name} />
@@ -223,6 +239,12 @@ export function StudyExplorer({
                   tópicos
                 </h3>
               </div>
+              <button className="button" onClick={build}>
+                <Plus size={17} />
+                Criar trilha deste assunto
+              </button>
+              <details className="study-preview-modules">
+                <summary>Ver módulos e objetivo da trilha</summary>
               <p>{preview.objective}</p>
               {["Java", "Spring Boot", "Spring Cloud"].includes(
                 templateFor(searched),
@@ -240,10 +262,6 @@ export function StudyExplorer({
                   </small>
                 </a>
               )}
-              <button className="button" onClick={build}>
-                <Plus size={17} />
-                Criar trilha deste assunto
-              </button>
               <ol>
                 {preview.modules.map((m) => (
                   <li key={m.id}>
@@ -252,6 +270,7 @@ export function StudyExplorer({
                   </li>
                 ))}
               </ol>
+              </details>
             </div>
           ) : (
             <p className="planning-note" role="status">
@@ -262,10 +281,14 @@ export function StudyExplorer({
           )}
           <div className="section-heading">
             <h3>Fontes para {searched}</h3>
-            <span>{sources.length} referências</span>
+            <span>{visibleSources.length} de {sources.length} referências</span>
           </div>
-          {sources.length ? (
-            sources.map((r, i) => (
+          {checkedAt && <p className="muted small">Última consulta: <time dateTime={checkedAt}>{new Date(checkedAt).toLocaleString("pt-BR")}</time></p>}
+          <div className="study-source-filters" role="group" aria-label="Tipos de fonte">
+            {[["all","Todas"],["official","Documentação"],["article","Artigos e tutoriais"],["community","Discussões"]].map(([value,label])=><button key={value} type="button" aria-pressed={kind===value} onClick={()=>setKind(value!)}>{label}</button>)}
+          </div>
+          {visibleSources.length ? (
+            visibleSources.map((r, i) => (
               <a
                 key={`${r.url}-${i}`}
                 className="source-result"
@@ -274,9 +297,7 @@ export function StudyExplorer({
                 rel="noopener noreferrer"
               >
                 <span className="source-kind">
-                  {r.kind === "official"
-                    ? "Documentação oficial"
-                    : "Comunidade · Stack Overflow"}
+                  {sourceLabels[r.kind]} · {sourcePublisher(r)}
                 </span>
                 <strong>
                   {r.title}
@@ -287,11 +308,15 @@ export function StudyExplorer({
             ))
           ) : (
             <p className="muted small">
-              Nenhuma fonte encontrada. Tente o nome da tecnologia em inglês ou
-              acrescente um tópico específico. Você pode cadastrar suas próprias
-              referências na trilha.
+              Nenhum resultado neste tipo de fonte. Experimente outro filtro,
+              um termo mais específico ou as buscas diretas abaixo.
             </p>
           )}
+          <details className="study-direct-search help" open={sources.length === 0}>
+            <summary>Pesquisar também nas fontes</summary>
+            <p className="muted small">Estas buscas abrem no site original com o assunto preenchido. São atalhos para aprofundar, não artigos encontrados. Alguns sites podem exigir login ou assinatura.</p>
+            <div className="study-search-links">{studySearchLinks(searched).map(link=><a key={link.title} href={link.url} target="_blank" rel="noopener noreferrer">{link.title}<ArrowUpRight size={16}/></a>)}</div>
+          </details>
           {preview && (
             <details className="help">
               <summary>Personalizar foco (opcional)</summary>

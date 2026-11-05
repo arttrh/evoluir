@@ -31,7 +31,7 @@ public class Remote {
     public Result request(URI uri, Map<String, String> form, String token) {
         if (!"https".equals(uri.getScheme()) || uri.getUserInfo() != null
                 || !List.of("api.github.com", "hn.algolia.com", "api.stackexchange.com", "www.strava.com",
-                    "blog.jetbrains.com", "inside.java", "spring.io", "feed.infoq.com", "martinfowler.com", "go.dev", "blog.python.org",
+                    "www.baeldung.com", "medium.com", "dev.to", "www.reddit.com", "blog.jetbrains.com", "inside.java", "spring.io", "feed.infoq.com", "martinfowler.com", "go.dev", "blog.python.org",
                     "devblogs.microsoft.com", "kubernetes.io", "blog.talosintelligence.com", "www.microsoft.com")
                     .contains(uri.getHost())) throw new IllegalArgumentException("Destino não permitido.");
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(9))
