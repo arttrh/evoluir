@@ -68,4 +68,4 @@ revoke all on function public.prumo_telegram_store(text, jsonb) from public, ano
 grant execute on function public.prumo_telegram_store(text, jsonb) to service_role;
 
 create extension if not exists pg_cron;
-create extension if not exists pg_net;
+create extension if not exists pg_net with schema extensions;

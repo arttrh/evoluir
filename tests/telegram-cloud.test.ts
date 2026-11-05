@@ -1,7 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { once } from "node:events";
 import type { Server } from "node:http";
-import { authorized, incomingJson, startTelegramWeb } from "../server/telegram-cloud";
+import { createHmac } from "node:crypto";
+import { authorized, authorizedScan, incomingJson, startTelegramWeb } from "../server/telegram-cloud";
 import { TelegramWorker } from "../server/telegram";
 
 let server: Server | undefined;
@@ -25,6 +26,19 @@ it("compara credenciais sem aceitar ausentes, arrays ou comprimento diferente", 
   expect(authorized(["secret"], "secret")).toBe(false);
   expect(authorized("secre", "secret")).toBe(false);
   expect(authorized("secret", "secret")).toBe(true);
+});
+function scanHeaders(timestamp = Math.floor(Date.now() / 1000).toString()) {
+  return { "x-prumo-timestamp": timestamp,
+    "x-prumo-signature": createHmac("sha256", settings.TELEGRAM_SCAN_SECRET).update(`scan:${timestamp}`).digest("hex") };
+}
+it("o agendamento exige assinatura válida e recusa assinaturas vencidas", () => {
+  const timestamp = "1793847600";
+  const headers = scanHeaders(timestamp);
+  const now = Number(timestamp) * 1000;
+  expect(authorizedScan(timestamp, headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET, now)).toBe(true);
+  expect(authorizedScan(timestamp, headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET, now + 301000)).toBe(false);
+  expect(authorizedScan(timestamp, headers["x-prumo-signature"], "wrong", now)).toBe(false);
+  expect(authorizedScan(undefined, headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET, now)).toBe(false);
 });
 it("limita o corpo antes de interpretar o JSON", async () => {
   async function* chunks() { yield Buffer.from('{"a":'); yield Buffer.from('"123456"}'); }
@@ -65,6 +79,6 @@ it("lease ocupado devolve conflito e não reconhece atualização como processad
 it("falha de persistência não vira sucesso HTTP", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 503 })));
   const origin = await listen();
-  const response = await realFetch(`${origin}/scan`, { method: "POST", headers: { Authorization: `Bearer ${settings.TELEGRAM_SCAN_SECRET}` }, body: "{}" });
+  const response = await realFetch(`${origin}/scan`, { method: "POST", headers: scanHeaders(), body: "{}" });
   expect(response.status).toBe(503);
 });

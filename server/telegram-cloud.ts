@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual, createHmac } from "node:crypto";
 import { z } from "zod";
 import { TelegramWorker, stateSchema, telegramConfigSchema } from "./telegram.js";
 import { readBounded } from "./http.js";
@@ -21,6 +21,13 @@ export function authorized(supplied: unknown, expected: string) {
   if (typeof supplied !== "string") return false;
   const a = Buffer.from(supplied); const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function authorizedScan(timestamp: unknown, signature: unknown, key: string, now = Date.now()) {
+  if (typeof timestamp !== "string" || !/^\d{10,}$/.test(timestamp)) return false;
+  const seconds = Number(timestamp);
+  if (!Number.isSafeInteger(seconds) || Math.abs(now / 1000 - seconds) > 300) return false;
+  return authorized(signature, createHmac("sha256", key).update(`scan:${timestamp}`).digest("hex"));
 }
 
 export async function incomingJson(request: AsyncIterable<Uint8Array>, maximum = 65536) {
@@ -80,7 +87,7 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
     if (!webhook && !scan) { response.writeHead(404).end("{}"); return; }
     const allowed = webhook
       ? authorized(request.headers["x-telegram-bot-api-secret-token"], settings.TELEGRAM_WEBHOOK_SECRET)
-      : authorized(request.headers.authorization, `Bearer ${settings.TELEGRAM_SCAN_SECRET}`);
+      : authorizedScan(request.headers["x-prumo-timestamp"], request.headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET);
     if (!allowed) { response.writeHead(401).end("{}"); return; }
     try {
       const input = await incomingJson(request);
