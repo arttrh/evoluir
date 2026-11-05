@@ -32,3 +32,22 @@ test("sincroniza e vincula sem duplicar sessão ou alterar progresso no iPhone",
   await expect(panel.getByRole("heading",{name:"Sessão de teste",exact:true})).toHaveCount(1);
   expect(await page.evaluate(()=>localStorage.getItem("evoluir.data.v1"))).toBe(before);
 });
+
+// The real entry is a cross-origin POST from a new tab; noreferrer made its Origin null.
+test("abre pelo botão e preserva Origin no formulário privado",async({page,context})=>{
+  const {default:handler}=await import("../../api/learning");
+  const target="https://learning-example.onrender.com";
+  const original=process.env.LEARNHARNESS_URL;process.env.LEARNHARNESS_URL=target;
+  const headers:Record<string,string>={};let html="";
+  try { await handler({method:"GET",query:{op:"open"}} as any,{setHeader:(k:string,v:string)=>{headers[k]=v},end:(value:string)=>{html=value}} as any); }
+  finally { if(original===undefined)delete process.env.LEARNHARNESS_URL;else process.env.LEARNHARNESS_URL=original; }
+  await context.route("**/api/learning?op=open",route=>route.fulfill({headers,body:html}));
+  await context.route("**/api/learning?op=ticket",route=>route.fulfill({json:{target,ticket:"a".repeat(43)}}));
+  let origin:string|undefined,submitted="";
+  await context.route(target+"/prumo/access",route=>{origin=route.request().headers().origin;submitted=route.request().postData()||"";return route.fulfill({contentType:"text/html; charset=utf-8",body:"Sessão privada aberta"});});
+  await page.route("**/api/learning",route=>route.fulfill({json:{syncedAt:new Date().toISOString(),sessions:[]}}));
+  await page.goto("/");const expectedOrigin=new URL(page.url()).origin;
+  await page.getByRole("navigation").getByRole("button",{name:"Estudos",exact:true}).click();
+  const popupPromise=context.waitForEvent("page");await page.getByRole("link",{name:/Abrir LearnHarness/}).click();const popup=await popupPromise;
+  await expect(popup.getByText("Sessão privada aberta")).toBeVisible();expect(origin).toBe(expectedOrigin);expect(submitted).toBe("ticket="+"a".repeat(43));
+});

@@ -53,6 +53,7 @@ it("abre a tela de espera imediatamente sem depender do Render acordado",async()
   vi.stubEnv("LEARNHARNESS_URL","https://learning-example.onrender.com");
   const fetch=vi.fn();vi.stubGlobal("fetch",fetch);await handler(req,res);
   expect(fetch).not.toHaveBeenCalled();
+  expect(res.setHeader).toHaveBeenCalledWith("Referrer-Policy","strict-origin");
   expect(vi.mocked(res.end).mock.calls[0]?.[0]).toContain("/api/learning?op=ticket");
   expect(vi.mocked(res.end).mock.calls[0]?.[0]).toContain("Preparando o LearnHarness");
   expect(res.setHeader).toHaveBeenCalledWith("Cache-Control","private, no-store");

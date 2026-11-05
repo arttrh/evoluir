@@ -39,7 +39,7 @@ export function LearnHarnessPanel({ tracks }: { tracks: Track[] }) {
   return <section className="panel learning-panel" aria-labelledby={`${id}-title`} aria-busy={busy}>
     <div className="section-heading"><h2 id={`${id}-title`}>Sessões no LearnHarness</h2><button className="button secondary" disabled={busy || Boolean(saving)} onClick={() => void synchronize()}>{busy ? "Sincronizando…" : "Atualizar"}</button></div>
     <p className="muted">Estude online e vincule suas sessões às trilhas. Visitar um assunto não o marca como aprendido.</p>
-    <a className="button" href="/api/learning?op=open" target="_blank" rel="noopener noreferrer">Abrir LearnHarness <span className="sr-only">em outra aba</span></a>
+    <a className="button" href="/api/learning?op=open" target="_blank" rel="noopener">Abrir LearnHarness <span className="sr-only">em outra aba</span></a>
     <div aria-live="polite">{result && <p className="small muted">Última sincronização: <time dateTime={result.syncedAt}>{new Date(result.syncedAt).toLocaleString("pt-BR")}</time></p>}{busy && <p role="status">Consultando seus estudos… O primeiro acesso gratuito pode levar até dois minutos.</p>}</div>
     {error && <p role="alert" className="form-error">{error}</p>}
     {!busy && !error && result?.sessions.length === 0 && <p>Ainda não há sessões. Abra o LearnHarness para começar.</p>}

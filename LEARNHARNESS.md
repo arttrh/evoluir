@@ -95,6 +95,10 @@ fonte correspondente são mantidas, sem publicar conversas ou dados pessoais.
 - Java validado em cópia limpa do commit publicado, incluindo os novos testes;
   as alterações pendentes de outros trabalhos ficaram intactas.
 
+A abertura em outra aba usa `rel="noopener"` e `Referrer-Policy: strict-origin`: a
+origem precisa acompanhar o formulário POST para a autorização. `noreferrer`
+fazia o navegador enviar uma origem opaca e causava 403 no fluxo pelo botão.
+
 A sessão sintética da implantação anterior foi recuperada após o reinício
 no Render. O acesso via formulário no domínio do Prumo retornou 303, estabeleceu
 a sessão privada e carregou a interface móvel. Uma nova pergunta sobre Java
