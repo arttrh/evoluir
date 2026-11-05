@@ -2,6 +2,8 @@
 
 ## Busca pública e conexão supervisionada Gupy — 2026-11-05
 
+A busca pública foi publicada em `4495555`, deploy `dep-dbm983l6e07s73bhjll0` no estado `live`. O cron foi reativado em `*/30 * * * *`. O primeiro disparo real retornou 200, enviou sete avisos novos e uma seleção de interesse já foi persistida pela conta vinculada. O perfil ainda não contém sessão autenticada da Gupy; a conexão pessoal continua aguardando login supervisionado. Nenhuma inscrição foi enviada.
+
 O conector de sessão foi publicado em `635f02b` e adiciona `/gupy/connect` com autorização privada, cifragem autenticada, verificação real do endpoint de conta Gupy e persistência somente após a confirmação inicial. A chave fica no Render e no arquivo privado deste computador, fora do banco e do repositório. O menu local **Conectar Gupy ao Evoluir** abre o login oficial; a tentativa inicial encerrou sem enviar sessão e nenhuma conexão real foi declarada como concluída.
 
 A busca pública Gupy foi implementada separadamente e validada sem login: 100 anúncios retornados e sete compatíveis. O modo de nuvem mantém GitHub bloqueado e LinkedIn desconectado. O botão **Tenho interesse** registra seleção; não faz inscrição.
