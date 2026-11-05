@@ -51,7 +51,6 @@ async function tokenRequest(params: Record<string, string>) {
   return tokenSchema.parse(await response.json());
 }
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (await forwardToJava(req, res, "/api/strava")) return;
   res.setHeader("Cache-Control", "private, no-store");
   res.setHeader("Vary", "Cookie");
   const parsed = configSchema.safeParse({
@@ -60,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     session: process.env.STRAVA_SESSION_SECRET,
     origin: process.env.APP_ORIGIN,
   });
+  // Keep OAuth where its private credentials are configured; Vercel secrets cannot be exported.
+  if (!parsed.success && await forwardToJava(req, res, "/api/strava")) return;
   const op = String(req.query.op || "status");
   const cookies = readCookies(req.headers.cookie);
   let token: StravaToken | undefined;

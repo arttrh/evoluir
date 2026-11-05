@@ -45,7 +45,7 @@ O contêiner executa com usuário sem privilégios. A hospedagem deve fornecer H
 
 1. Configure `BACKEND_API_KEY` somente no servidor Java. Sem chave forte, ele não inicia.
 2. Mantenha `APP_ORIGIN` no endereço público atual do site.
-3. Para Strava, transfira com segurança as três variáveis `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` e `STRAVA_SESSION_SECRET` já existentes no servidor. Preserve a chave de sessão atual: o formato AES-256-GCM é compatível com o Node, incluindo os nomes e atributos dos cookies seguros. O callback continua no domínio atual `/api/strava?op=callback`.
+3. Strava usa o servidor da Vercel quando `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_SESSION_SECRET` e `APP_ORIGIN` estão completos lá, mesmo com o proxy Java ativo. Se a Vercel não tiver configuração Strava completa, a rota é encaminhada ao Java; nesse caso, configure as três variáveis Strava no Render. Segredos sensíveis da Vercel não podem ser exportados. Preserve a chave de sessão existente ao mover uma conexão ativa; Node e Java usam o mesmo formato AES-256-GCM e cookies seguros. O callback permanece `/api/strava?op=callback` no domínio do Prumo.
 4. Teste o Java com a chave no cabeçalho `X-Prumo-Backend-Key`. A rota de saúde também exige a chave; use uma verificação TCP se a hospedagem não permite cabeçalhos na verificação de saúde.
 5. Na Vercel, configure `JAVA_BACKEND_URL` com a origem HTTPS do Java, sem caminho, e `JAVA_BACKEND_KEY` com o mesmo valor de `BACKEND_API_KEY`. Não use prefixo `VITE_`.
 6. Publique, confira vagas, notícias, estudos e conexão Strava. Não remova a proteção nativa de login.

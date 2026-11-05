@@ -60,6 +60,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("fronteira Strava", () => {
+  it("usa a configuração privada da Vercel mesmo com o proxy Java ativo", async () => {
+    configure();vi.stubEnv("JAVA_BACKEND_URL","https://java.example.test");vi.stubEnv("JAVA_BACKEND_KEY","private-test-backend-key-".repeat(3));
+    const fetch=vi.fn();vi.stubGlobal("fetch",fetch);const res=response();
+    await handler(req("status"),res as unknown as ApiResponse);
+    expect(res.body).toEqual({configured:true,connected:false});expect(fetch).not.toHaveBeenCalled();
+  });
+  it("mantém o encaminhamento Java quando a Vercel não tem configuração Strava completa",async()=>{
+    vi.stubEnv("STRAVA_CLIENT_ID","");vi.stubEnv("JAVA_BACKEND_URL","https://java.example.test");vi.stubEnv("JAVA_BACKEND_KEY","private-test-backend-key-".repeat(3));
+    const fetch=vi.fn().mockResolvedValue(Response.json({configured:true,connected:false}));vi.stubGlobal("fetch",fetch);const res={...response(),end:vi.fn()};
+    await handler(req("status"),res as unknown as ApiResponse);
+    expect(String(fetch.mock.calls[0][0])).toBe("https://java.example.test/api/strava?op=status");expect(res.end).toHaveBeenCalled();
+  });
   it("sessão criptografada resiste a adulteração e chave diferente", () => {
     const value = seal({ token }, secret);
     expect(value).not.toContain(token.access_token);
