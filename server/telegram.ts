@@ -94,23 +94,35 @@ export class TelegramWorker {
     const update = updateSchema.parse(input);
     if (update.update_id < this.state.offset) return;
     const message = update.message;
+    const start = new RegExp(`^/start(?:@${this.config.botUsername})?(?:\\s+(\\S+))?\\s*$`, "i").exec(message?.text || "");
     if (!this.state.chatId && message?.chat.type === "private" && message.from
-        && message.chat.id === message.from.id && message.text === `/start ${this.config.pairCode}`) {
+        && message.chat.id === message.from.id && start?.[1] === this.config.pairCode) {
       this.state.chatId = message.chat.id;
       this.state.userId = message.from.id;
       await this.save();
-      await this.message("Conectado ao Evoluir! Vou buscar Java júnior e estágio a cada 30 minutos, sem filtro de localização. Só aviso vagas novas.\n\nUse /status, /perfil, /pausar ou /retomar. O botão Tenho interesse salva sua seleção; ainda não envia currículo.");
+      await this.message(this.cloud
+        ? "Conta vinculada ao Evoluir.\n\nEscopo: Java júnior e estágio, somente LinkedIn com candidatura simplificada e Gupy. As buscas antigas no GitHub foram suspensas. A busca e o envio nessas duas plataformas ainda não estão conectados.\n\nUse /status e /perfil. Nenhuma candidatura foi enviada."
+        : "Conectado ao Evoluir. Use /status, /perfil e /pausar. Nenhuma candidatura foi enviada.");
       console.log("Conversa privada vinculada.");
+    } else if (start && message?.chat.type === "private" && message.from
+        && message.chat.id === message.from.id && message.from.id !== this.state.userId) {
+      await this.api("sendMessage", { chat_id: message.chat.id,
+        text: "Olá! O bot está online. Para acessar seu perfil, abra o link privado de vinculação recebido na conversa em que você configurou o bot e toque em Iniciar. O /start sozinho não autoriza acesso ao currículo. Não envie senhas aqui." });
     } else if (message?.chat.type === "private" && message.chat.id === this.state.chatId
         && message.from?.id === this.state.userId) {
       if (message.text === "/pausar") { this.state.paused = true; await this.save(); await this.message("Avisos pausados. Use /retomar para continuar."); }
-      else if (message.text === "/retomar") { this.state.paused = false; await this.save(); await this.message("Avisos retomados."); }
+      else if (message.text === "/retomar") {
+        if (this.cloud) await this.message("A busca no LinkedIn com candidatura simplificada e na Gupy ainda não está conectada. As buscas antigas continuam suspensas.");
+        else { this.state.paused = false; await this.save(); await this.message("Avisos retomados."); }
+      }
       else if (message.text === "/perfil" && this.cloud?.profile) {
         const profile = this.cloud.profile;
         await this.message(`Currículo: ${profile.resumeSource.split("/").pop()}\n\nLinkedIn: ${profile.links.linkedin}\nGitHub: ${profile.links.github}\nPortfólio: ${profile.links.portfolio}\n\nCanal de envio ainda não conectado. Nenhuma candidatura foi enviada.`);
       }
       else if (message.text === "/status" || message.text?.startsWith("/start")) {
-        await this.message(`Java júnior e estágio · a cada ${this.config.intervalMinutes} minutos · ${this.state.paused ? "pausado" : "ativo"}.\nÚltima busca: ${this.state.lastSearch ? new Date(this.state.lastSearch).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "aguardando"}.\nVagas selecionadas: ${Object.values(this.state.entries).filter(e => e.status === "interesse").length}.\nEnvio de currículo ainda não configurado.`);
+        await this.message(this.cloud
+          ? "Conta vinculada. Fontes autorizadas: LinkedIn com candidatura simplificada e Gupy. Perfil: Java júnior e estágio. Frequência desejada: 30 minutos.\n\nBusca e envio nessas plataformas ainda não conectados. Busca no GitHub suspensa. Use /perfil para conferir currículo e links."
+          : `Java júnior e estágio · a cada ${this.config.intervalMinutes} minutos · ${this.state.paused ? "pausado" : "ativo"}.\nÚltima busca: ${this.state.lastSearch ? new Date(this.state.lastSearch).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "aguardando"}.\nVagas selecionadas: ${Object.values(this.state.entries).filter(e => e.status === "interesse").length}.\nEnvio de currículo ainda não configurado.`);
       }
     }
     const callback = update.callback_query;
@@ -118,7 +130,7 @@ export class TelegramWorker {
       let text = "Ação não autorizada ou vaga indisponível.";
       const match = /^(interesse|ignorada):([a-f0-9]{24})$/.exec(callback.data || "");
       if (callback.from.id === this.state.userId && callback.message?.chat.type === "private"
-          && callback.message.chat.id === this.state.chatId && match && this.state.entries[match[2]]) {
+          && callback.message.chat.id === this.state.chatId && match && this.state.entries[match[2]] && !this.cloud) {
         this.state.entries[match[2]].status = match[1] as "interesse" | "ignorada";
         await this.save();
         text = match[1] === "interesse" ? "Interesse salvo. Nenhum currículo foi enviado." : "Vaga ignorada.";
@@ -131,6 +143,8 @@ export class TelegramWorker {
   }
 
   async scan(now = Date.now()) {
+    // shortcut: nuvem restrita a LinkedIn/Gupy, reativar apenas com conectores verificados dessas plataformas.
+    if (this.cloud) return;
     if (!this.state.chatId || this.state.paused || now - this.state.lastSearch < this.config.intervalMinutes * 60000) return;
     const vacancies = new Map<string, Vacancy>();
     // As variantes evitam combinar júnior e estágio como requisitos simultâneos.

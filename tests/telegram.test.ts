@@ -43,6 +43,34 @@ it("vincula apenas uma conversa privada com o código e persiste com permissão 
   expect(statSync(bot.stateFile).mode & 0o777).toBe(0o600);
   expect(new TelegramWorker(bot.config, bot.stateFile).state.userId).toBe(123);
 });
+it("start comum responde sem vincular conta, revelar o código ou acessar o perfil", async () => {
+  const bot = worker();
+  await bot.handleUpdate(start(123, "/start"));
+  expect(bot.state.chatId).toBeUndefined();
+  expect(bot.api).toHaveBeenCalledWith("sendMessage", expect.objectContaining({ chat_id: 123, text: expect.stringContaining("bot está online") }));
+  const reply = String(vi.mocked(bot.api).mock.calls[0][1]?.text);
+  expect(reply).not.toContain(config.pairCode);
+  expect(reply).not.toContain("curriculo.pdf");
+});
+it("aceita start com nome do bot e código sem permitir assumir uma conta vinculada", async () => {
+  const bot = worker();
+  await bot.handleUpdate(start(123, `/start@examplebot ${config.pairCode}`));
+  expect(bot.state.chatId).toBe(123);
+  await bot.handleUpdate({ ...start(456), update_id: 11 });
+  expect(bot.state.chatId).toBe(123);
+});
+it("nuvem não consulta GitHub, não retoma fontes antigas e informa os conectores pendentes", async () => {
+  const persist = vi.fn().mockResolvedValue(undefined);
+  const bot = new TelegramWorker(config, "", { state: { paused: true }, persist });
+  vi.spyOn(bot, "api").mockResolvedValue(true);
+  await bot.handleUpdate(start());
+  await bot.handleUpdate({ ...start(123, "/retomar"), update_id: 11 });
+  await bot.handleUpdate({ ...start(123, "/status"), update_id: 12 });
+  await bot.scan();
+  expect(bot.state.paused).toBe(true);
+  expect(searchJobs).not.toHaveBeenCalled();
+  expect(bot.api).toHaveBeenLastCalledWith("sendMessage", expect.objectContaining({ text: expect.stringContaining("Busca e envio nessas plataformas ainda não conectados") }));
+});
 it("não consulta vagas antes da vinculação ou quando pausado", async () => {
   const bot = worker();
   await bot.scan();

@@ -94,7 +94,6 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
       const completed = await operation(webhook ? "update" : "scan", input);
       if (!completed) { response.writeHead(409).end('{"error":"Operação em andamento."}'); return; }
       response.end('{"ok":true}');
-      if (webhook) void operation("scan").catch(() => console.error("Busca após mensagem falhou; nova tentativa no agendamento."));
     } catch {
       console.error("Operação Telegram não confirmada; dados e segredos omitidos.");
       response.writeHead(503).end('{"error":"Operação não confirmada."}');

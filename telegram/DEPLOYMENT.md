@@ -1,5 +1,13 @@
 # Publicação do bot de vagas
 
+## Correção posterior — 2026-11-05
+
+O serviço recebeu `/start`, mas ignorou o comando sem o código de vinculação. A resposta orientativa foi adicionada, mantendo o bloqueio de acesso ao perfil por terceiros. Os testes cobrem `/start` comum, comando com nome do bot e tentativa de assumir conta já vinculada.
+
+Escopo atualizado: somente LinkedIn com candidatura simplificada e Gupy. O cron `prumo-telegram-half-hour` está **inativo**, o estado está pausado e a busca antiga no GitHub foi bloqueada na nuvem, inclusive após `/retomar`. Perfil e PDF foram preservados. A conexão com essas plataformas ainda não foi implementada.
+
+Validação da correção: `npm run check` passou com 190 testes, TypeScript e build. As evidências abaixo registram a publicação anterior; não comprovam operação atual das novas fontes.
+
 Verificação em 2026-11-05, workspace Render `My Workspace`, somente plano Free.
 
 - Serviço: [prumo-telegram](https://dashboard.render.com/web/srv-dblv4o0u01pc73fsb83g).

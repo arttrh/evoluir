@@ -1,5 +1,15 @@
 # Avisos pessoais de vagas pelo Telegram
 
+## Escopo atual — 2026-11-05
+
+O usuário restringiu candidaturas a **LinkedIn com candidatura simplificada** e **Gupy**, mantendo Java júnior/estágio e a frequência desejada de 30 minutos. As contas e currículos nessas plataformas já estão preenchidos, mas não estão conectados ao serviço.
+
+A busca antiga no GitHub está bloqueada no modo de nuvem e o cron foi desativado. `/retomar` não reativa fontes fora desse escopo. A implementação de busca e candidatura nessas plataformas continua pendente; o bot informa esse estado em `/start` e `/status`. As seções sobre busca GitHub abaixo descrevem o modo local legado, não a configuração atual da nuvem.
+
+O `/start` comum agora recebe uma resposta pública de orientação sem vincular conta nem revelar o código privado. O link com código continua necessário para acessar perfil e currículo. Isso corrige o silêncio anterior: a mensagem era recebida e confirmada, mas o handler não respondia quando faltava o código.
+
+[O LinkedIn restringe automação de atividades por ferramentas externas](https://www.linkedin.com/help/linkedin/answer/a1341543). Uma conta pessoal com currículo preenchido não equivale a uma integração autorizada para envio automático. Não foram importadas sessões, senhas ou cookies do usuário.
+
 O bot reutiliza `server/job-search.ts`: consulta Backend BR e Frontend BR por Java júnior e estágio, sem filtro de localização, a cada 30 minutos. O modo local precisa de computador ligado; o modo de nuvem recebe webhooks no Render Free e usa Supabase Cron e Postgres, sem depender do computador.
 
 Não envia currículo, não preenche formulários nem cria contas em sites de vagas. Os botões **Tenho interesse** e **Ignorar** guardam a seleção no estado privado. Esse estado ainda não sincroniza com o painel do Evoluir.
