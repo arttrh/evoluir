@@ -43,9 +43,9 @@ export async function verifyGupySession(input: unknown, key: string) {
   if (session.userAgent) headers["User-Agent"] = session.userAgent;
   const response = await fetch(gupyAccountUrl, { headers, redirect: "error", signal: AbortSignal.timeout(15000) });
   if (response.status === 401 || response.status === 403) return false;
-  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("A Gupy não confirmou a sessão.");
+  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new Error("A Gupy não confirmou a sessão.", { cause: `gupy_http_${response.status}` });
   const body = JSON.parse(await readBounded(response, 500000));
   if (!body || typeof body !== "object" || Array.isArray(body) || !Object.keys(body).length || body.error)
-    throw new Error("A Gupy não confirmou a sessão.");
+    throw new Error("A Gupy não confirmou a sessão.", { cause: "gupy_unexpected_shape" });
   return true;
 }

@@ -54,7 +54,7 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
       method: "POST", headers: { Authorization: `Bearer ${settings.TELEGRAM_STORE_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify(command), redirect: "error", signal: AbortSignal.timeout(20000),
     });
-    if (!response.ok) throw new Error("Persistência indisponível.");
+    if (!response.ok) throw new Error("Persistência indisponível.", { cause: `store_http_${response.status}` });
     return JSON.parse(await readBounded(response, 4_000_000));
   }
 
@@ -100,22 +100,29 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
       : gupy ? authorized(request.headers.authorization, `Bearer ${settings.TELEGRAM_STORE_TOKEN}`)
         : authorizedScan(request.headers["x-prumo-timestamp"], request.headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET);
     if (!allowed) { response.writeHead(401).end("{}"); return; }
+    let stage = "read_request";
     try {
       const input = await incomingJson(request);
       if (gupy) {
+        stage = "decrypt_gupy_session";
         if (!settings.GUPY_SESSION_KEY) throw new Error("Conexão não configurada.");
         const sealed = sealedGupySchema.parse(input);
         openGupySession(sealed, settings.GUPY_SESSION_KEY);
+        stage = "verify_gupy_account";
         if (!await verifyGupySession(sealed, settings.GUPY_SESSION_KEY)) {
-          response.writeHead(401).end('{"error":"A Gupy não confirmou a sessão."}'); return;
+          response.writeHead(401).end('{"error":"gupy_session_invalid"}'); return;
         }
+        stage = "persist_gupy_session";
         await store({ op: "connect_gupy", session: sealed });
       }
+      stage = "process_operation";
       const completed = await operation(gupy ? "gupy" : webhook ? "update" : "scan", input);
       if (!completed) { response.writeHead(409).end('{"error":"Operação em andamento."}'); return; }
       response.end('{"ok":true}');
-    } catch {
-      console.error("Operação Telegram não confirmada; dados e segredos omitidos.");
+    } catch (error) {
+      const cause = error instanceof Error ? error.cause : undefined;
+      const code = typeof cause === "string" && /^(gupy_http_\d+|gupy_unexpected_shape|store_http_\d+)$/.test(cause) ? cause : "details_omitted";
+      console.error(`Operação não confirmada: ${stage}, ${code}. Dados e segredos omitidos.`);
       response.writeHead(503).end('{"error":"Operação não confirmada."}');
     }
   });
