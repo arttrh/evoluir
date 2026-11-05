@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import { authorized, authorizedScan, incomingJson, startTelegramWeb } from "../server/telegram-cloud";
 import { TelegramWorker } from "../server/telegram";
 import { sealGupySession, gupyAccountUrl } from "../server/gupy-session";
-import { digest, openPrivate } from "../server/candidate-profile";
+import { digest, openPrivate, sealPrivate } from "../server/candidate-profile";
 
 let server: Server | undefined;
 const settings = {
@@ -130,10 +130,17 @@ it("cadastro usa link único, cookie HttpOnly, CSRF e persistência cifrada; sal
   expect(cookie).toContain("HttpOnly"); expect(cookie).toContain("SameSite=Strict"); expect(cookie).toContain("Secure");
   expect((await exchange()).status).toBe(401);
   const headers = { Cookie: cookie.split(";")[0], Origin: "https://prumo-telegram.onrender.com" };
+  const applicationId = "a".repeat(24);
+  state.entries[applicationId] = { vacancy: { title: "Java Júnior", url: "https://empresa.gupy.io/jobs/42", source: "Gupy", publishedAt: "2026-11-05T00:00:00.000Z", labels: [], description: "Java" }, status: "interesse", at: "2026-11-05T00:00:00.000Z" };
+  state.flow.applications[applicationId] = { status: "review", nonce: "f".repeat(16), expiresAt: Date.now() + 60000,
+    profileVersion: 0, snapshot: sealPrivate({ private: "dados de revisão" }, key, `draft:${applicationId}`), snapshotHash: "c".repeat(64), reviewedHash: "c".repeat(64), tasks: [], remindedAt: 0 };
   expect((await realFetch(`${origin}/private/profile`)).status).toBe(401);
   expect((await realFetch(`${origin}/private/profile`, { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body: "{}" })).status).toBe(403);
   const saved = await realFetch(`${origin}/private/profile`, { method: "POST", headers, body: JSON.stringify({ version: 0, candidate: { cpf: "52998224725", motherName: "Informação privada de teste" } }) });
   expect(saved.status).toBe(200); expect(state.flow.version).toBe(1);
+  expect(state.flow.applications[applicationId]).toMatchObject({ status: "cancelled" });
+  expect(state.flow.applications[applicationId].snapshot).toBeUndefined();
+  expect(state.flow.applications[applicationId].reviewedHash).toBeUndefined();
   expect(JSON.stringify(state)).not.toContain("52998224725"); expect(JSON.stringify(state)).not.toContain("Informação privada de teste");
   expect(openPrivate(state.flow.vault, key, "candidate")).toMatchObject({ cpf: "52998224725" });
   expect((await realFetch(`${origin}/private/profile`, { headers })).status).toBe(200);

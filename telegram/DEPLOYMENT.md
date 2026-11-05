@@ -1,5 +1,18 @@
 # Publicação do bot de vagas
 
+## Cadastro privado e acompanhamento de candidaturas — 2026-11-05
+
+Código `9df8ad834727a0a3b082b387a85981b6109a599a`, deploy `dep-dbma9kjm8hqs73f6ce6g`, confirmado `live`. A publicação mantém o serviço Free, a branch isolada, a sessão Gupy existente, o PDF e o cron de 30 minutos. Não cria tabelas nem altera LearnHarness, a API Java ou a aplicação principal.
+
+- `/cadastro`: link privado de uso único, cookie protegido, documentos cifrados, edição e exclusão. `/candidaturas`: revisão privada e confirmação separada para iniciar e concluir cada inscrição. `/pendencias` e `/sincronizar`: consulta de etapas e lembretes de avaliações feitas pelo candidato.
+- `npm run check`: 219 testes, TypeScript e build aprovados. Permanece o aviso anterior de tamanho do bundle principal.
+- Chromium real: navegação, campos ocultos, revisão e acessibilidade sem violações em 1440, 768 e 390 px. Inspeção visual e verificador da interface sem FAIL/WARN. Estilo Achromatic ledger, seed 37600279, sem redesenhos; tipografia existente e fundo neutro do Evoluir. O cadastro responde quais dados serão reutilizados; a revisão responde quais dados e empresa serão autorizados. Dados sintéticos foram usados somente nos testes, sem fixtures de produção.
+- Produção: saúde 200; HTML, JS e CSS correspondem ao commit; perfil anônimo 401. Troca real de link por cookie e leitura privada confirmadas, reutilização recusada, origem externa recusada e logout revogando acesso. PDF autenticado com SHA-256 igual ao original.
+- Leitura autenticada real da vaga e do currículo Gupy passou no novo cliente; duas consultas produziram revisão estável. Não houve POST de candidatura para validar a integração: início/conclusão ainda dependem da primeira aprovação de uma vaga pelo usuário. O envio não é considerado validado integralmente só porque o deploy está no ar.
+- Cron continua ativo; estado Gupy conectado e zero inscrições registradas pelo fluxo no encerramento da validação. O link inicial do cadastro foi enviado ao Telegram vinculado. Se vencer, `/cadastro` gera outro.
+
+O conector usa o currículo já cadastrado na Gupy. O PDF do Evoluir e o cadastro privado não atualizam esse currículo automaticamente. Salário e RG reconhecidos entram na revisão dos dados adicionais; perguntas da empresa e campos não reconhecidos ficam para preenchimento na Gupy. LinkedIn permanece sem conexão. O protocolo e a recuperação estão em [GUPY.md](GUPY.md).
+
 ## Conexão Gupy confirmada — 2026-11-05
 
 A verificação da conta real falhava com 500 na Gupy, apresentado como 503 pelo serviço. Com a mesma sessão e o mesmo endpoint, a requisição sem contexto de login retornou 500; com `Origin` e `Referer` do login retornou 200 e identificação de conta. O cliente foi alterado para Firefox isolado via BiDi, e a sessão cifrada passou a ser preservada em falhas temporárias.
