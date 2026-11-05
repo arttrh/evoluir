@@ -91,6 +91,18 @@ it("preserva estado corrompido e interrompe a inicialização", () => {
   expect(() => new TelegramWorker(config, path)).toThrow("Estado Telegram inválido");
   expect(readFileSync(path, "utf8")).toBe("{quebrado");
 });
+it("callback expirado não bloqueia novas mensagens após persistir a seleção", async () => {
+  const bot = worker();
+  await bot.handleUpdate(start());
+  const id = "b".repeat(24);
+  bot.state.entries[id] = { vacancy, status: "notificada", at: vacancy.publishedAt };
+  vi.mocked(bot.api).mockRejectedValueOnce(new Error("callback expirado"));
+  await bot.handleUpdate({ update_id: 11, callback_query: { id: "old", from: { id: 123 },
+    message: { chat: { id: 123, type: "private" } }, data: `interesse:${id}` } });
+  expect(bot.state.entries[id].status).toBe("interesse");
+  expect(bot.state.offset).toBe(12);
+  expect(new TelegramWorker(bot.config, bot.stateFile).state.offset).toBe(12);
+});
 it("falha da fonte não registra consulta bem-sucedida", async () => {
   const bot = worker();
   await bot.handleUpdate(start());

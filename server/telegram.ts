@@ -123,7 +123,8 @@ export class TelegramWorker {
         await this.save();
         text = match[1] === "interesse" ? "Interesse salvo. Nenhum currículo foi enviado." : "Vaga ignorada.";
       }
-      await this.api("answerCallbackQuery", { callback_query_id: callback.id, text, show_alert: true });
+      try { await this.api("answerCallbackQuery", { callback_query_id: callback.id, text, show_alert: true }); }
+      catch { console.error("Resposta visual do botão indisponível; seleção já processada não será repetida."); }
     }
     this.state.offset = update.update_id + 1;
     await this.save();
