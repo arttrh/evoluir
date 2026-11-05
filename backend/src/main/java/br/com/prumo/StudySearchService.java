@@ -125,6 +125,6 @@ public class StudySearchService {
         var seen=new HashSet<String>();
         var unique=sources.stream().filter(item->seen.add(NewsService.key((String)item.get("url")))).toList();
         String warning=unavailable.isEmpty()?"":"A busca não respondeu em: "+String.join(", ",unavailable)+". As demais fontes e as buscas diretas continuam disponíveis.";
-        return Map.of("query",raw,"sources",unique,"warning",warning,"searchedAt",Api.now());
+        return Map.of("query",raw,"sources",unique,"warning",warning,"unavailableSources",unavailable,"searchedAt",Api.now());
     }
 }

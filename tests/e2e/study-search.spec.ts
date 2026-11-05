@@ -1,5 +1,6 @@
 import {test,expect} from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import {studyProviders} from "../../src/study-sources";
 import {emptyData} from "../../src/model";
 
 test("pesquisa várias fontes por assunto, filtra por tipo e preserva progresso no iPhone",async({page})=>{
@@ -8,6 +9,7 @@ test("pesquisa várias fontes por assunto, filtra por tipo e preserva progresso 
  const requested:string[]=[];
  await page.route("**/api/study-search?*",route=>{
   const q=new URL(route.request().url()).searchParams.get('q')!;requested.push(q);
+  if(requested.length===1)return route.fulfill({json:{sources:[],warning:'Serviços iniciando',unavailableSources:studyProviders.map(provider=>provider.name)}});
   return route.fulfill({json:{query:q,searchedAt:'2026-11-05T00:00:00Z',warning:'A busca não respondeu em: Reddit. As buscas diretas continuam disponíveis.',sources:[
    {title:`Documentação ${q}`,url:'https://docs.python.org/3/library/asyncio.html',kind:'official',why:'Documentação oficial da linguagem.'},
    {title:`Tutorial ${q}`,url:'https://www.baeldung.com/example',kind:'article',publisher:'Baeldung',why:'Artigo para comparar com a documentação.'},
@@ -23,7 +25,7 @@ test("pesquisa várias fontes por assunto, filtra por tipo e preserva progresso 
  await page.getByText('Pesquisar também nas fontes',{exact:true}).click();
  await expect(page.locator('.study-search-links').getByRole('link',{name:'Reddit',exact:true})).toHaveAttribute('href','https://www.reddit.com/search/?q=Python%20asyncio');
  await search.fill('Go channels');await page.getByRole('button',{name:'Buscar fontes',exact:true}).click();
- await expect(page.getByText('Tutorial Go channels',{exact:true})).toBeVisible();expect(requested).toEqual(['Python asyncio','Go channels']);
+ await expect(page.getByText('Tutorial Go channels',{exact:true})).toBeVisible();expect(requested).toEqual(['Python asyncio','Python asyncio','Go channels']);
  expect(await page.evaluate(()=>localStorage.getItem('evoluir.data.v1'))).toBe(before);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  expect((await new AxeBuilder({page}).include('.study-explorer').analyze()).violations).toEqual([]);

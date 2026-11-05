@@ -2535,3 +2535,7 @@ dialog[open] {
 .study-explorer .source-result > span:last-child { font-size: 13px; }
 .study-preview-modules summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 13px; }
 .study-preview-modules p { font-size: 13px; margin: 12px 0; }
+
+.study-failed-source-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.study-failed-source-links a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 13px; }
+.study-failed-source-links a { color: #403c35; text-underline-offset: 3px; }

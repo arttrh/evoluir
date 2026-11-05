@@ -20,6 +20,9 @@ As buscas nativas de Stack Overflow, Reddit e Hacker News recebem o assunto.
 Cada provedor entrega até cinco resultados. URLs repetidas são removidas,
 ignorando parâmetros comuns de rastreamento. Datas de publicação não são inventadas.
 A interface informa a hora da consulta e quais fontes ficaram indisponíveis.
+Se todos os provedores falharem no primeiro acesso, refaz a consulta uma vez
+para recuperar uma inicialização fria do serviço gratuito. Falhas parciais
+mostram links diretos às fontes afetadas ao lado do aviso.
 
 O catálogo de tecnologias, tags e provedores é compartilhado com o Java pelo
 exportador `scripts/export-java-catalog.mjs`. Consultar fontes não altera

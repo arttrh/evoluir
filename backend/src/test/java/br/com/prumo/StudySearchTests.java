@@ -47,6 +47,8 @@ class StudySearchTests {
         var search=new StudySearchService(study,remote,json);
         try {
             var result=search.search("Python asyncio");var sources=(List<?>)result.get("sources");
+            assertThat(result).containsKey("unavailableSources");
+            assertThat((List<?>)result.get("unavailableSources")).hasSize(3);
             assertThat(sources).hasSize(4);assertThat(result.get("warning").toString()).contains("Reddit").doesNotContain("Baeldung");
             assertThat(result.toString()).contains("Baeldung","DEV Community","Referência oficial");
         }finally{search.close();}

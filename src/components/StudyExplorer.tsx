@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   officialSources,
+  studyProviders,
   sourcePublisher,
   studySearchLinks,
   roadmapFor,
@@ -73,11 +74,15 @@ export function StudyExplorer({
     setSources([]);
     setSearched("");
     try {
-      const response = await fetchCloud(`/api/study-search?q=${encodeURIComponent(value.trim())}`, abort.signal);
-      if (!response.ok) throw new Error();
-      const result = z
-        .object({ sources: z.array(studySourceSchema).max(80), warning: z.string(), searchedAt: z.iso.datetime().optional() })
-        .parse(await response.json());
+      const schema = z.object({ sources: z.array(studySourceSchema).max(80), warning: z.string(), searchedAt: z.iso.datetime().optional(), unavailableSources: z.array(z.string()).optional() });
+      async function read() {
+        const response = await fetchCloud(`/api/study-search?q=${encodeURIComponent(value.trim())}`, abort.signal);
+        if (!response.ok) throw new Error();
+        return schema.parse(await response.json());
+      }
+      let result = await read();
+      // A new Free instance can fail every upstream request while starting; retry once.
+      if (studyProviders.every(provider => result.unavailableSources?.includes(provider.name))) result = await read();
       if (abort.signal.aborted) return;
       setCheckedAt(result.searchedAt || "");
       setSources(result.sources);
@@ -225,6 +230,7 @@ export function StudyExplorer({
       {error && (
         <p className="planning-note" role="status">
           {error}
+          {searched && <span className="study-failed-source-links">{studySearchLinks(searched).filter(link=>error.includes(link.title)).map(link=><a key={link.title} href={link.url} target="_blank" rel="noopener noreferrer">Pesquisar em {link.title}<ArrowUpRight size={14}/></a>)}</span>}
         </p>
       )}
       {searched && (

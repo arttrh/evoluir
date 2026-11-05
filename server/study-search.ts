@@ -61,5 +61,5 @@ export async function searchStudy(query: string) {
   const results=await Promise.allSettled(jobs),sources=officialSources(query),unavailable:string[]=[];
   results.forEach((result,index)=>{if(result.status==="fulfilled")sources.push(...result.value);else unavailable.push(studyProviders[index]!.name);});
   const seen=new Set<string>();
-  return {query,sources:sources.filter(item=>{const key=newsKey(item.url);if(seen.has(key))return false;seen.add(key);return true;}),warning:unavailable.length?`A busca não respondeu em: ${unavailable.join(", ")}. As demais fontes e as buscas diretas continuam disponíveis.`:"",searchedAt:new Date().toISOString()};
+  return {query,unavailableSources:unavailable,sources:sources.filter(item=>{const key=newsKey(item.url);if(seen.has(key))return false;seen.add(key);return true;}),warning:unavailable.length?`A busca não respondeu em: ${unavailable.join(", ")}. As demais fontes e as buscas diretas continuam disponíveis.`:"",searchedAt:new Date().toISOString()};
 }
