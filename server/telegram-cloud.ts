@@ -6,6 +6,7 @@ import { randomUUID, timingSafeEqual, createHmac } from "node:crypto";
 import { z } from "zod";
 import { TelegramWorker, stateSchema, telegramConfigSchema } from "./telegram.js";
 import { readBounded } from "./http.js";
+import { openGupySession, sealedGupySchema, verifyGupySession } from "./gupy-session.js";
 
 const settingsSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d{6,}:[A-Za-z0-9_-]{30,}$/),
@@ -14,6 +15,7 @@ const settingsSchema = z.object({
   TELEGRAM_SCAN_SECRET: z.string().regex(/^[a-f0-9]{64}$/),
   TELEGRAM_STORE_TOKEN: z.string().regex(/^[a-f0-9]{64}$/),
   TELEGRAM_STORE_URL: z.string().regex(/^https:\/\/[a-z0-9]+\.supabase\.co\/functions\/v1\/prumo-telegram-store$/),
+  GUPY_SESSION_KEY: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   PORT: z.coerce.number().int().min(0).max(65535).default(10000),
 });
 
@@ -56,7 +58,7 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
     return JSON.parse(await readBounded(response, 4_000_000));
   }
 
-  async function operation(kind: "scan" | "update", input?: unknown) {
+  async function operation(kind: "scan" | "update" | "gupy", input?: unknown) {
     const owner = randomUUID();
     const acquired = await store({ op: "acquire", owner });
     if (!acquired) return false;
@@ -68,7 +70,14 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
           revision = z.number().int().positive().parse(saved.revision);
         },
       });
-      if (kind === "scan") {
+      if (kind === "gupy") {
+        if (!settings.GUPY_SESSION_KEY || !bot.state.chatId) throw new Error("Conexão não configurada.");
+        const connected = await verifyGupySession(acquired.profile?.gupySession, settings.GUPY_SESSION_KEY);
+        bot.state.gupy = { status: connected ? "connected" : "expired", verifiedAt: new Date().toISOString() };
+        await bot.save();
+        if (connected) await bot.message("Conexão com a Gupy confirmada pelo servidor. Sua sessão está cifrada na nuvem; nenhuma senha foi enviada ao chat.\n\nO envio de candidaturas ainda não está habilitado. Use /gupy para consultar a conexão.");
+        return connected;
+      } else if (kind === "scan") {
         // O horário por janela evita pular uma rodada por poucos segundos de diferença entre disparos do cron.
         await bot.scan(Math.floor(Date.now() / 1800000) * 1800000);
       } else await bot.handleUpdate(input);
@@ -84,14 +93,25 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
     if (path === "/health" && request.method === "GET") { response.end('{"ok":true}'); return; }
     const webhook = path === "/webhook" && request.method === "POST";
     const scan = path === "/scan" && request.method === "POST";
-    if (!webhook && !scan) { response.writeHead(404).end("{}"); return; }
+    const gupy = path === "/gupy/connect" && request.method === "POST";
+    if (!webhook && !scan && !gupy) { response.writeHead(404).end("{}"); return; }
     const allowed = webhook
       ? authorized(request.headers["x-telegram-bot-api-secret-token"], settings.TELEGRAM_WEBHOOK_SECRET)
-      : authorizedScan(request.headers["x-prumo-timestamp"], request.headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET);
+      : gupy ? authorized(request.headers.authorization, `Bearer ${settings.TELEGRAM_STORE_TOKEN}`)
+        : authorizedScan(request.headers["x-prumo-timestamp"], request.headers["x-prumo-signature"], settings.TELEGRAM_SCAN_SECRET);
     if (!allowed) { response.writeHead(401).end("{}"); return; }
     try {
       const input = await incomingJson(request);
-      const completed = await operation(webhook ? "update" : "scan", input);
+      if (gupy) {
+        if (!settings.GUPY_SESSION_KEY) throw new Error("Conexão não configurada.");
+        const sealed = sealedGupySchema.parse(input);
+        openGupySession(sealed, settings.GUPY_SESSION_KEY);
+        if (!await verifyGupySession(sealed, settings.GUPY_SESSION_KEY)) {
+          response.writeHead(401).end('{"error":"A Gupy não confirmou a sessão."}'); return;
+        }
+        await store({ op: "connect_gupy", session: sealed });
+      }
+      const completed = await operation(gupy ? "gupy" : webhook ? "update" : "scan", input);
       if (!completed) { response.writeHead(409).end('{"error":"Operação em andamento."}'); return; }
       response.end('{"ok":true}');
     } catch {

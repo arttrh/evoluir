@@ -26,6 +26,7 @@ export const stateSchema = z.object({
   paused: z.boolean().default(false),
   lastSearch: z.number().nonnegative().default(0),
   entries: z.record(z.string(), entrySchema).default({}),
+  gupy: z.object({ status: z.enum(["connected", "expired"]), verifiedAt: z.string().datetime() }).optional(),
 });
 const userSchema = z.object({ id: z.number().int().positive() });
 const messageSchema = z.object({
@@ -118,6 +119,11 @@ export class TelegramWorker {
       else if (message.text === "/perfil" && this.cloud?.profile) {
         const profile = this.cloud.profile;
         await this.message(`Currículo: ${profile.resumeSource.split("/").pop()}\n\nLinkedIn: ${profile.links.linkedin}\nGitHub: ${profile.links.github}\nPortfólio: ${profile.links.portfolio}\n\nCanal de envio ainda não conectado. Nenhuma candidatura foi enviada.`);
+      }
+      else if (message.text === "/gupy") {
+        await this.message(this.state.gupy?.status === "connected"
+          ? `Sessão da Gupy confirmada em ${new Date(this.state.gupy.verifiedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.\n\nIsso confirma acesso à conta. O envio automático de candidaturas ainda não está habilitado.`
+          : "Para conectar sua conta, use o computador uma vez: abra o menu de aplicativos e procure Conectar Gupy ao Evoluir. Entre na janela oficial da Gupy e aguarde a confirmação aqui. Não envie senha ou código por mensagem.\n\nA sessão será guardada cifrada na nuvem. Se ela expirar, repita esse processo. Abrir apenas o site da Gupy no celular não conecta o bot.");
       }
       else if (message.text === "/status" || message.text?.startsWith("/start")) {
         await this.message(this.cloud

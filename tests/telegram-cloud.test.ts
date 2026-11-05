@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import { createHmac } from "node:crypto";
 import { authorized, authorizedScan, incomingJson, startTelegramWeb } from "../server/telegram-cloud";
 import { TelegramWorker } from "../server/telegram";
+import { sealGupySession, gupyAccountUrl } from "../server/gupy-session";
 
 let server: Server | undefined;
 const settings = {
@@ -16,8 +17,8 @@ afterEach(async () => {
   if (server) { server.closeAllConnections(); await new Promise<void>(resolve => server!.close(() => resolve())); server = undefined; }
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
-async function listen() {
-  server = await startTelegramWeb(settings);
+async function listen(extra: NodeJS.ProcessEnv = {}) {
+  server = await startTelegramWeb({ ...settings, ...extra });
   if (!server.listening) await once(server, "listening");
   return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 }
@@ -49,7 +50,7 @@ it("saúde não expõe dados e rotas privadas recusam requisições sem segredo"
   const remote = vi.fn(); vi.stubGlobal("fetch", remote);
   const origin = await listen();
   expect(await (await realFetch(`${origin}/health`)).json()).toEqual({ ok: true });
-  for (const path of ["/scan", "/webhook"]) expect((await realFetch(`${origin}${path}`, { method: "POST", body: "{}" })).status).toBe(401);
+  for (const path of ["/scan", "/webhook", "/gupy/connect"]) expect((await realFetch(`${origin}${path}`, { method: "POST", body: "{}" })).status).toBe(401);
   expect(remote).not.toHaveBeenCalled();
 });
 it("só confirma o webhook depois de persistir e ignora a repetição do update", async () => {
@@ -81,4 +82,32 @@ it("falha de persistência não vira sucesso HTTP", async () => {
   const origin = await listen();
   const response = await realFetch(`${origin}/scan`, { method: "POST", headers: scanHeaders(), body: "{}" });
   expect(response.status).toBe(503);
+});
+it("só registra conexão Gupy depois de validar a sessão pelo servidor e persistir o estado", async () => {
+  const key = "e".repeat(64);
+  const sealed = sealGupySession({ authorization: "Bearer fake-gupy-session" }, key);
+  let state: unknown = { chatId: 123, userId: 123 }; let revision = 0; let imported = false;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+    if (String(url) === gupyAccountUrl) return Response.json({ id: 42 });
+    if (String(url).startsWith("https://api.telegram.org/")) return Response.json({ ok: true, result: true });
+    const command = JSON.parse(String(init.body));
+    if (command.op === "connect_gupy") { imported = true; return Response.json(true); }
+    if (command.op === "acquire") return Response.json({ state, revision, profile: { gupySession: sealed } });
+    if (command.op === "save") { state = command.state; return Response.json({ revision: ++revision }); }
+    return Response.json(true);
+  }));
+  const origin = await listen({ GUPY_SESSION_KEY: key });
+  const response = await realFetch(`${origin}/gupy/connect`, { method: "POST", headers: { Authorization: `Bearer ${settings.TELEGRAM_STORE_TOKEN}` }, body: JSON.stringify(sealed) });
+  expect(response.status).toBe(200);
+  expect(imported).toBe(true);
+  expect(state).toMatchObject({ gupy: { status: "connected" } });
+});
+it("sessão rejeitada pela Gupy não substitui a sessão anterior no banco", async () => {
+  const key = "e".repeat(64);
+  const remote = vi.fn().mockResolvedValue(new Response("{}", { status: 401 })); vi.stubGlobal("fetch", remote);
+  const origin = await listen({ GUPY_SESSION_KEY: key });
+  const response = await realFetch(`${origin}/gupy/connect`, { method: "POST", headers: { Authorization: `Bearer ${settings.TELEGRAM_STORE_TOKEN}` }, body: JSON.stringify(sealGupySession({ cookie: "session=expired" }, key)) });
+  expect(response.status).toBe(401);
+  expect(remote).toHaveBeenCalledTimes(1);
+  expect(remote).toHaveBeenCalledWith(gupyAccountUrl, expect.anything());
 });
