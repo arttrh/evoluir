@@ -1,5 +1,13 @@
 # Conectar a conta de candidato da Gupy
 
+## Busca pública e avisos
+
+`server/gupy-jobs.ts` consulta `https://portal.gupy.io/api/job-search/jobs` com `jobName=java`, até 100 anúncios por consulta. Esse contrato foi observado em navegação real no portal; não é a API empresarial. O bot filtra júnior/estágio, recusa anúncios vencidos e URLs fora das páginas de vaga HTTPS da Gupy. Falha da fonte não é apresentada como lista vazia nem aciona outra fonte.
+
+O teste real encontrou sete vagas compatíveis entre 100 anúncios retornados. Essa quantidade muda e não garante disponibilidade de todas as vagas. Os avisos, seleções e deduplicação ficam no banco privado. Selecionar **Tenho interesse** não envia uma candidatura.
+
+## Conexão da conta
+
 A conexão usa um login supervisionado em uma janela isolada do Chromium, aberta no computador do usuário. Não é uma integração OAuth oficial nem usa a API empresarial da Gupy. O login ocorre em `https://login.gupy.io/candidates/signin`, testado na página real antes da implementação.
 
 ## Passo a passo neste computador

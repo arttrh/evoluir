@@ -4,7 +4,9 @@
 
 O usuário restringiu candidaturas a **LinkedIn com candidatura simplificada** e **Gupy**, mantendo Java júnior/estágio e a frequência desejada de 30 minutos. As contas e currículos nessas plataformas já estão preenchidos, mas não estão conectados ao serviço.
 
-A busca antiga no GitHub está bloqueada no modo de nuvem e o cron foi desativado. `/retomar` não reativa fontes fora desse escopo. A implementação de busca e candidatura nessas plataformas continua pendente; o bot informa esse estado em `/start` e `/status`. As seções sobre busca GitHub abaixo descrevem o modo local legado, não a configuração atual da nuvem.
+A busca antiga no GitHub está bloqueada no modo de nuvem. A busca pública da Gupy usa o mesmo endpoint observado no portal oficial, filtra Java júnior/estágio e permite avisos a cada 30 minutos. Ela não usa login nem credenciais do candidato. `/retomar` habilita somente Gupy autorizada no perfil; nunca reativa GitHub na nuvem. LinkedIn e envio de candidaturas continuam pendentes. As seções sobre busca GitHub abaixo descrevem o modo local legado, não a configuração atual da nuvem.
+
+A conexão da conta Gupy é separada da busca pública. Siga [as instruções de login supervisionado](telegram/GUPY.md): o usuário entra na página oficial em uma janela isolada no computador; o servidor valida a autorização e guarda somente a sessão cifrada. A senha não é capturada. A conta não é declarada conectada antes dessa verificação real.
 
 O `/start` comum agora recebe uma resposta pública de orientação sem vincular conta nem revelar o código privado. O link com código continua necessário para acessar perfil e currículo. Isso corrige o silêncio anterior: a mensagem era recebida e confirmada, mas o handler não respondia quando faltava o código.
 

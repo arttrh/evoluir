@@ -4,8 +4,13 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TelegramWorker, matchesJavaEntry } from "../server/telegram";
 import { searchJobs } from "../server/job-search";
+import { searchGupyJobs } from "../server/gupy-jobs";
 
 vi.mock("../server/job-search", () => ({ searchJobs: vi.fn() }));
+vi.mock("../server/gupy-jobs", async importOriginal => {
+  const original = await importOriginal<typeof import("../server/gupy-jobs")>();
+  return { ...original, searchGupyJobs: vi.fn() };
+});
 vi.mock("node:timers/promises", () => ({ setTimeout: vi.fn().mockResolvedValue(undefined) }));
 let folder: string;
 const config = { tokenFile: "", botUsername: "examplebot", pairCode: "a".repeat(24), intervalMinutes: 30, location: "" };
@@ -69,7 +74,23 @@ it("nuvem não consulta GitHub, não retoma fontes antigas e informa os conector
   await bot.scan();
   expect(bot.state.paused).toBe(true);
   expect(searchJobs).not.toHaveBeenCalled();
-  expect(bot.api).toHaveBeenLastCalledWith("sendMessage", expect.objectContaining({ text: expect.stringContaining("Busca e envio nessas plataformas ainda não conectados") }));
+  expect(bot.api).toHaveBeenLastCalledWith("sendMessage", expect.objectContaining({ text: expect.stringContaining("LinkedIn e envio de candidaturas ainda não conectados") }));
+});
+it("nuvem consulta somente Gupy autorizada e registra interesse sem enviar candidatura", async () => {
+  const bot = new TelegramWorker(config, "", { state: {}, persist: vi.fn().mockResolvedValue(undefined),
+    profile: { resumeSource: "curriculo.pdf", links: { github: "", linkedin: "", portfolio: "" }, applicationSources: ["Gupy", "LinkedIn Easy Apply"] } });
+  vi.spyOn(bot, "api").mockResolvedValue(true);
+  await bot.handleUpdate(start());
+  vi.mocked(searchGupyJobs).mockResolvedValue([{ ...vacancy, source: "Gupy", url: "https://empresa.gupy.io/jobs/123" }]);
+  await bot.scan();
+  expect(searchGupyJobs).toHaveBeenCalledTimes(1);
+  expect(searchJobs).not.toHaveBeenCalled();
+  const [id] = Object.keys(bot.state.entries);
+  expect(bot.state.entries[id].vacancy.source).toBe("Gupy");
+  await bot.handleUpdate({ update_id: 11, callback_query: { id: "gupy-interest", from: { id: 123 },
+    message: { chat: { id: 123, type: "private" } }, data: `interesse:${id}` } });
+  expect(bot.state.entries[id].status).toBe("interesse");
+  expect(bot.api).toHaveBeenLastCalledWith("answerCallbackQuery", expect.objectContaining({ text: "Interesse salvo. Nenhum currículo foi enviado." }));
 });
 it("não consulta vagas antes da vinculação ou quando pausado", async () => {
   const bot = worker();

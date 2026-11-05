@@ -16,12 +16,15 @@ if (!/^https:\/\/[a-z0-9-]+\.onrender\.com$/.test(deployment.url) || !/^[a-f0-9]
 const vite = await createServer({ root: fileURLToPath(new URL("../", import.meta.url)), configFile: false,
   server: { middlewareMode: true }, optimizeDeps: { noDiscovery: true, include: [] }, appType: "custom", logLevel: "silent" });
 let browser;
+let stage = "abrir a janela";
+let serverStatus;
 try {
   const { gupyAccountUrl, sealGupySession } = await vite.ssrLoadModule("/server/gupy-session.ts");
   await vite.close();
   browser = await chromium.launch({ headless: false, executablePath: "/usr/bin/chromium" });
   const context = await browser.newContext();
   const page = await context.newPage();
+  stage = "concluir o login na Gupy";
   console.log("Entre na janela oficial da Gupy. Senha e código ficam nessa janela, sem registro no terminal.");
   console.log("Após o login, a autorização da sessão será cifrada e enviada ao seu bot para verificação. Nenhuma candidatura será enviada.");
   const authenticated = new Promise((resolve, reject) => {
@@ -40,12 +43,14 @@ try {
   const [, session] = await Promise.all([
     page.goto("https://login.gupy.io/candidates/signin", { waitUntil: "domcontentloaded", timeout: 30000 }), authenticated,
   ]);
+  stage = "validar a sessão no servidor";
   const response = await fetch(`${deployment.url}/gupy/connect`, { method: "POST", redirect: "error",
     headers: { Authorization: `Bearer ${secrets.store}`, "Content-Type": "application/json" },
     body: JSON.stringify(sealGupySession(session, secrets.gupyKey)), signal: AbortSignal.timeout(120000) });
+  serverStatus = response.status;
   if (!response.ok) throw new Error("O servidor não confirmou a conexão. Confira /gupy no Telegram.");
   console.log("Gupy conectada e verificada pelo servidor. Confira a confirmação no Telegram.");
 } catch {
-  console.error("A conexão não foi confirmada. Confira se o login terminou, se a conta do bot está vinculada e tente novamente. Credenciais omitidas.");
+  console.error(`A conexão não foi confirmada na etapa: ${stage}.${serverStatus ? ` Resposta HTTP: ${serverStatus}.` : ""} Abra novamente Conectar Gupy ao Evoluir para tentar. Credenciais omitidas.`);
   process.exitCode = 1;
 } finally { await browser?.close(); await vite.close(); }

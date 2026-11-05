@@ -1,5 +1,13 @@
 # Publicação do bot de vagas
 
+## Busca pública e conexão supervisionada Gupy — 2026-11-05
+
+O conector de sessão foi publicado em `635f02b` e adiciona `/gupy/connect` com autorização privada, cifragem autenticada, verificação real do endpoint de conta Gupy e persistência somente após a confirmação inicial. A chave fica no Render e no arquivo privado deste computador, fora do banco e do repositório. O menu local **Conectar Gupy ao Evoluir** abre o login oficial; a tentativa inicial encerrou sem enviar sessão e nenhuma conexão real foi declarada como concluída.
+
+A busca pública Gupy foi implementada separadamente e validada sem login: 100 anúncios retornados e sete compatíveis. O modo de nuvem mantém GitHub bloqueado e LinkedIn desconectado. O botão **Tenho interesse** registra seleção; não faz inscrição.
+
+`npm run check` passou com 201 testes, TypeScript e build. O teste da conexão de conta usa credenciais simuladas; a comprovação com a conta real depende de o usuário concluir o login e de o servidor confirmar a sessão. Nenhuma senha, cookie ou token real aparece nos fixtures ou no fonte.
+
 ## Correção posterior — 2026-11-05
 
 O serviço recebeu `/start`, mas ignorou o comando sem o código de vinculação. A resposta orientativa foi adicionada, mantendo o bloqueio de acesso ao perfil por terceiros. Os testes cobrem `/start` comum, comando com nome do bot e tentativa de assumir conta já vinculada.

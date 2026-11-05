@@ -63,4 +63,3 @@ end;
 $$;
 revoke all on function public.prumo_telegram_store(text, jsonb) from public, anon, authenticated;
 grant execute on function public.prumo_telegram_store(text, jsonb) to service_role;
-
