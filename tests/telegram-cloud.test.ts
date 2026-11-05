@@ -5,6 +5,7 @@ import { createHmac } from "node:crypto";
 import { authorized, authorizedScan, incomingJson, startTelegramWeb } from "../server/telegram-cloud";
 import { TelegramWorker } from "../server/telegram";
 import { sealGupySession, gupyAccountUrl } from "../server/gupy-session";
+import { digest, openPrivate } from "../server/candidate-profile";
 
 let server: Server | undefined;
 const settings = {
@@ -110,4 +111,35 @@ it("sessão rejeitada pela Gupy não substitui a sessão anterior no banco", asy
   expect(response.status).toBe(401);
   expect(remote).toHaveBeenCalledTimes(1);
   expect(remote).toHaveBeenCalledWith(gupyAccountUrl, expect.anything());
+});
+
+it("cadastro usa link único, cookie HttpOnly, CSRF e persistência cifrada; salvar invalida aprovações", async () => {
+  const token = "f".repeat(64); const key = "e".repeat(64);
+  let state: any = { chatId: 123, userId: 123, flow: { portal: { ticketHash: digest(token), ticketUntil: Date.now() + 60000 } } };
+  let revision = 0;
+  vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+    const command = JSON.parse(String(init.body));
+    if (command.op === "acquire") return Response.json({ state, revision });
+    if (command.op === "save") { state = command.state; return Response.json({ revision: ++revision }); }
+    return Response.json(true);
+  }));
+  const origin = await listen({ GUPY_SESSION_KEY: key });
+  const exchange = () => realFetch(`${origin}/private/session`, { method: "POST", headers: { Origin: "https://prumo-telegram.onrender.com" }, body: JSON.stringify({ token }) });
+  const response = await exchange(); expect(response.status).toBe(200);
+  const cookie = response.headers.get("set-cookie")!;
+  expect(cookie).toContain("HttpOnly"); expect(cookie).toContain("SameSite=Strict"); expect(cookie).toContain("Secure");
+  expect((await exchange()).status).toBe(401);
+  const headers = { Cookie: cookie.split(";")[0], Origin: "https://prumo-telegram.onrender.com" };
+  expect((await realFetch(`${origin}/private/profile`)).status).toBe(401);
+  expect((await realFetch(`${origin}/private/profile`, { method: "POST", headers: { ...headers, Origin: "https://evil.example" }, body: "{}" })).status).toBe(403);
+  const saved = await realFetch(`${origin}/private/profile`, { method: "POST", headers, body: JSON.stringify({ version: 0, candidate: { cpf: "52998224725", motherName: "Informação privada de teste" } }) });
+  expect(saved.status).toBe(200); expect(state.flow.version).toBe(1);
+  expect(JSON.stringify(state)).not.toContain("52998224725"); expect(JSON.stringify(state)).not.toContain("Informação privada de teste");
+  expect(openPrivate(state.flow.vault, key, "candidate")).toMatchObject({ cpf: "52998224725" });
+  expect((await realFetch(`${origin}/private/profile`, { headers })).status).toBe(200);
+  expect((await realFetch(`${origin}/private/profile`, { method: "POST", headers, body: JSON.stringify({ version: 0, candidate: {} }) })).status).toBe(409);
+  expect((await realFetch(`${origin}/private/profile`, { method: "DELETE", headers })).status).toBe(200);
+  expect(state.flow.vault).toBeUndefined();
+  expect((await realFetch(`${origin}/private/logout`, { method: "POST", headers, body: "{}" })).status).toBe(200);
+  expect((await realFetch(`${origin}/private/profile`, { headers })).status).toBe(401);
 });

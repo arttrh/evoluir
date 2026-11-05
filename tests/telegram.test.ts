@@ -74,7 +74,7 @@ it("nuvem não consulta GitHub, não retoma fontes antigas e informa os conector
   await bot.scan();
   expect(bot.state.paused).toBe(true);
   expect(searchJobs).not.toHaveBeenCalled();
-  expect(bot.api).toHaveBeenLastCalledWith("sendMessage", expect.objectContaining({ text: expect.stringContaining("LinkedIn e envio de candidaturas ainda não conectados") }));
+  expect(bot.api).toHaveBeenLastCalledWith("sendMessage", expect.objectContaining({ text: expect.stringContaining("LinkedIn ainda não conectado") }));
 });
 it("nuvem consulta somente Gupy autorizada e registra interesse sem enviar candidatura", async () => {
   const bot = new TelegramWorker(config, "", { state: {}, persist: vi.fn().mockResolvedValue(undefined),
