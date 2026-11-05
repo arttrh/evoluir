@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "@playwright/test";
+import { firefox } from "@playwright/test";
 import { createServer } from "vite";
 
 const folder = join(homedir(), ".config", "evoluir-telegram");
@@ -35,13 +35,13 @@ try {
     unlinkSync(pendingFile); return true;
   }
   let connected = false;
-  if (existsSync(pendingFile)) {
+  if (existsSync(pendingFile) && !process.argv.includes("--login")) {
     console.log("Retomando a sessão cifrada anterior, sem pedir novo login.");
     connected = await upload(sealedGupySchema.parse(JSON.parse(readFileSync(pendingFile, "utf8"))));
   }
   if (!connected) {
     serverStatus = undefined;
-    browser = await chromium.launch({ headless: false, executablePath: "/usr/bin/chromium" });
+    browser = await firefox.launch({ headless: false, channel: "moz-firefox", executablePath: "/usr/bin/firefox" });
     const context = await browser.newContext();
     const page = await context.newPage();
     stage = "concluir o login na Gupy";

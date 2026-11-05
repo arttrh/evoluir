@@ -30,3 +30,12 @@ it("sessão expirada não é declarada como conectada e falhas da plataforma nã
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "invalid-session" })));
   await expect(verifyGupySession(sealed, key)).rejects.toThrow();
 });
+it("preserva o contexto do login exigido pela Gupy para validar a credencial", async () => {
+  const remote = vi.fn(async (_url: string, options: RequestInit) => {
+    const headers = options.headers as Record<string, string>;
+    return headers.Origin === "https://login.gupy.io" && headers.Referer === "https://login.gupy.io/"
+      ? Response.json({ id: 123 }) : new Response("", { status: 500 });
+  });
+  vi.stubGlobal("fetch", remote);
+  expect(await verifyGupySession(sealGupySession(credentials, key), key)).toBe(true);
+});

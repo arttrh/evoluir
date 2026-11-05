@@ -37,7 +37,7 @@ export function openGupySession(input: unknown, key: string) {
 
 export async function verifyGupySession(input: unknown, key: string) {
   const session = openGupySession(input, key);
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", Origin: "https://login.gupy.io", Referer: "https://login.gupy.io/" };
   if (session.authorization) headers.Authorization = session.authorization;
   if (session.cookie) headers.Cookie = session.cookie;
   if (session.userAgent) headers["User-Agent"] = session.userAgent;
