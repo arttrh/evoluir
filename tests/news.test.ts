@@ -249,3 +249,12 @@ it("atualização manual impede cache e valida a página na fronteira", async ()
     expect(status).toBe(400);
   }
 });
+
+it("busca Java Annotated no RSS oficial da JetBrains com categoria Java", async () => {
+  const feed=newsFeeds.find(feed=>feed.name.includes("JetBrains"))!;
+  expect(feed.url).toBe("https://blog.jetbrains.com/idea/tag/java-annotated/feed/");
+  const calls:string[]=[];vi.stubGlobal("fetch",vi.fn(async(input:string|URL)=>{
+    const url=String(input);calls.push(url);return url===feed.url?new Response(rss("Java Annotated Monthly", "https://blog.jetbrains.com/idea/2026/10/java-annotated-monthly/")):Response.json({hits:[]});
+  }));
+  const result=await fetchNews("JetBrains");expect(calls).toContain(feed.url);expect(result.items).toHaveLength(1);expect(result.items[0]).toMatchObject({category:"Java",source:feed.name});
+});

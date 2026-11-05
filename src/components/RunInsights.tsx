@@ -14,7 +14,7 @@ export function RunInsights({ runs, date }: { runs: Run[]; date: string }) {
         {[
           [
             Route,
-            `${km.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} km`,
+            `${km.toLocaleString("pt-BR", { maximumFractionDigits: 3 })} km`,
             "Distância",
           ],
           [Timer, duration(seconds), "Tempo correndo"],

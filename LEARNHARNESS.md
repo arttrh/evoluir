@@ -1,7 +1,7 @@
 # LearnHarness no Prumo
 
-Integração preparada em 2026-11-03. A aplicação web LearnHarness já foi
-publicada; a ativação final no Prumo depende do deploy deste código.
+Integração publicada em 2026-11-03, com verificação real e correções de
+inicialização em 2026-11-04. Java e LearnHarness usam serviços Docker Free separados.
 
 ## Serviços
 
@@ -26,7 +26,9 @@ Codex, chave de API paga ou outro provedor. O modelo é `gpt-6.1-sol` via ChatGP
 correspondente à configuração atual e confirmado no catálogo autorizado real.
 Se a autorização for revogada, será necessário refazer a configuração do login.
 
-O botão **Abrir LearnHarness** passa pelo login da Vercel, gera um bilhete
+O botão **Abrir LearnHarness** passa pelo login da Vercel, mostra imediatamente
+a espera pela inicialização gratuita e tenta novamente automaticamente. Só
+depois de o serviço estar pronto, `/api/learning?op=ticket` gera um bilhete
 curto de uso único e estabelece uma sessão HttpOnly/Secure/SameSite no
 LearnHarness. As APIs e os streams também exigem autorização. Os agentes
 não podem ler arquivos privados da hospedagem.
@@ -93,10 +95,15 @@ fonte correspondente são mantidas, sem publicar conversas ou dados pessoais.
 - Java validado em cópia limpa do commit publicado, incluindo os novos testes;
   as alterações pendentes de outros trabalhos ficaram intactas.
 
-Ainda é necessário concluir a verificação pelo domínio do Prumo após o deploy,
-reconferir os registros depois de reiniciar/reimplantar o LearnHarness e remover
-apenas os registros sintéticos usados na validação. Isso não equivale a testar
-um iPhone físico ou a garantir funcionamento de todas as ferramentas pesadas.
+A sessão sintética da implantação anterior foi recuperada após o reinício
+no Render. O acesso via formulário no domínio do Prumo retornou 303, estabeleceu
+a sessão privada e carregou a interface móvel. Uma nova pergunta sobre Java
+recebeu resposta real do assistente, confirmada no histórico persistido.
+Isso não equivale a testar um iPhone físico ou todas as ferramentas pesadas.
+
+Os serviços existentes foram criados por URL pública do repositório; não
+presuma publicação automática após um push. Confira o SHA no Render e, se
+não houver nova implantação, publique o commit pelo dashboard do serviço.
 
 ## Limites dos planos gratuitos
 

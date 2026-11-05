@@ -35,15 +35,25 @@ it("falha de comunicação não expõe credenciais",async()=>{
   expect(res.status).toHaveBeenCalledWith(503);expect(JSON.stringify(vi.mocked(res.json).mock.calls)).not.toContain(process.env.JAVA_BACKEND_KEY);
 });
 it("abre somente com bilhete temporário; chaves privadas não entram no formulário",async()=>{
-  const {req,res}=setup();req.query.op="open";
+  const {req,res}=setup();req.query.op="ticket";
   vi.stubEnv("LEARNHARNESS_URL","https://learning-example.onrender.com");
   vi.stubEnv("PRUMO_STORE_URL","https://atzncofgyitahiguuhcn.supabase.co/functions/v1/prumo-lh-store");
   vi.stubEnv("PRUMO_GATEWAY_KEY","private-gateway-for-tests-".repeat(3));
   const fetch=vi.fn().mockResolvedValueOnce(Response.json({sessions:[]})).mockResolvedValueOnce(Response.json({ok:true}));vi.stubGlobal("fetch",fetch);
   await handler(req,res);
-  const html=String(vi.mocked(res.end).mock.calls[0]?.[0]);
-  expect(html).toContain('action="https://learning-example.onrender.com/prumo/access"');
-  expect(html).toMatch(/name="ticket" value="[A-Za-z0-9_-]{43}"/);
-  expect(html).not.toContain(process.env.PRUMO_GATEWAY_KEY);expect(html).not.toContain(process.env.JAVA_BACKEND_KEY);
+  const result=vi.mocked(res.json).mock.calls[0]?.[0] as {target:string;ticket:string};
+  expect(result.target).toBe("https://learning-example.onrender.com");
+  expect(result.ticket).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  expect(JSON.stringify(result)).not.toContain(process.env.PRUMO_GATEWAY_KEY);expect(JSON.stringify(result)).not.toContain(process.env.JAVA_BACKEND_KEY);
   expect(fetch.mock.calls[1][1].headers.Authorization).toBe(`Bearer ${process.env.PRUMO_GATEWAY_KEY}`);
+});
+
+it("abre a tela de espera imediatamente sem depender do Render acordado",async()=>{
+  const {req,res}=setup();req.query.op="open";
+  vi.stubEnv("LEARNHARNESS_URL","https://learning-example.onrender.com");
+  const fetch=vi.fn();vi.stubGlobal("fetch",fetch);await handler(req,res);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(vi.mocked(res.end).mock.calls[0]?.[0]).toContain("/api/learning?op=ticket");
+  expect(vi.mocked(res.end).mock.calls[0]?.[0]).toContain("Preparando o LearnHarness");
+  expect(res.setHeader).toHaveBeenCalledWith("Cache-Control","private, no-store");
 });

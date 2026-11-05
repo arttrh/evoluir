@@ -56,6 +56,11 @@ export const newsFeeds = [
     url: "https://www.microsoft.com/en-us/security/blog/feed/",
     category: "Segurança",
   },
+  {
+    name: "JetBrains · Java Annotated Monthly",
+    url: "https://blog.jetbrains.com/idea/tag/java-annotated/feed/",
+    category: "Java",
+  },
 ] as const;
 type Feed = { name: string; url: string; category: NewsItem["category"] };
 const list = (v: unknown): Record<string, unknown>[] =>

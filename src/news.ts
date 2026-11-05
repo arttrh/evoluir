@@ -1,6 +1,7 @@
 import { z } from "zod";
 export const newsCategories = [
   "Todas",
+  "JetBrains",
   "Go",
   "Python",
   "JavaScript",

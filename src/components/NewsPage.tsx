@@ -1,3 +1,4 @@
+import { fetchCloud } from "../cloud";
 import { AnimatedIcon } from "./AnimatedIcon";
 import { useEffect, useState, useRef } from "react";
 import {
@@ -61,10 +62,7 @@ export function NewsPage() {
       if (subject) params.set("q", subject);
       if (nextPage) params.set("page", String(nextPage));
       if (fresh) params.set("fresh", "1");
-      const r = await fetch(`/api/news${params.size ? `?${params}` : ""}`, {
-        signal: abort.signal,
-        cache: fresh ? "no-store" : "default",
-      });
+      const r = await fetchCloud(`/api/news${params.size ? `?${params}` : ""}`, abort.signal);
       if (!r.ok) throw new Error();
       const result = newsResponseSchema.parse(await r.json());
       if (!alive.current || abort.signal.aborted) return;
@@ -162,8 +160,8 @@ export function NewsPage() {
     <section className="news-page">
       <div className="news-intro">
         <div>
-          <h2>No seu radar.</h2>
-          <p>Tecnologia, desenvolvimento e segurança, de várias fontes.</p>
+          <h2>Java e tecnologia.</h2>
+          <p>Publicações na fonte original. Seu histórico de leitura fica neste aparelho.</p>
         </div>
         <button
           className="icon-button"
@@ -174,6 +172,9 @@ export function NewsPage() {
           <RefreshCw size={20} className={busy ? "spin" : ""} />
         </button>
       </div>
+      <aside className="news-source-note">
+        <a href="https://www.jetbrains.com/lp/jam/" target="_blank" rel="noopener noreferrer">JetBrains · Java Annotated Monthly <ArrowUpRight size={16} /></a>
+      </aside>
       <div className="news-toolbar">
         <div className="news-categories" aria-label="Categorias de notícias">
           {newsCategories.map((c) => (
@@ -233,7 +234,7 @@ export function NewsPage() {
               }
             }}
           >
-            Já vi lote
+            Marcar lote como visto
           </button>
         )}
       </div>
@@ -283,7 +284,7 @@ export function NewsPage() {
       {busy && !items.length ? (
         <div className="news-loading" role="status" aria-busy="true">
           <Newspaper size={26} />
-          <p>Buscando as últimas publicações…</p>
+          <p>Buscando as últimas publicações… O servidor gratuito pode levar um minuto para iniciar.</p>
         </div>
       ) : visible.length ? (
         <div className="news-grid">

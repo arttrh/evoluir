@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import {
   saveRun,
+  parseDecimal,
   changeJobStatus,
   addDays,
   areas,
@@ -103,7 +104,7 @@ type Editor = {
   jobDraft?: Partial<Job>;
 };
 const number = (n: number) =>
-  new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(n);
+  new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 }).format(n);
 function Empty({
   icon: Icon = Target,
   title,
@@ -569,8 +570,8 @@ export default function App() {
           const run: Run = {
             id: old?.id || uid(),
             date: s("date"),
-            distance: n("distance"),
-            seconds: Math.round(n("minutes") * 60),
+            distance: parseDecimal(s("distance")),
+            seconds: Math.round(parseDecimal(s("minutes")) * 60),
             notes: s("notes"),
             taskId,
           };
@@ -722,7 +723,7 @@ export default function App() {
           return {
             ...d,
             settings: {
-              weeklyKm: n("weeklyKm"),
+              weeklyKm: parseDecimal(s("weeklyKm")),
               dailyMinutes: n("dailyMinutes"),
               dailyFocus: s("dailyFocus"),
             },
@@ -875,27 +876,23 @@ export default function App() {
                   />
                 </Field>
                 <div className="form-grid">
-                  <Field label="Distância (km)">
+                  <Field label="Distância (km)" hint="4,1 km = 4 km e 100 m. 4,2 km = 4 km e 200 m. Use vírgula ou ponto.">
                     <input
                       name="distance"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.01"
-                      min="0.01"
-                      max="500"
+                      pattern="[0-9]+([,.][0-9]{1,3})?"
                       required
-                      defaultValue={run?.distance}
-                      placeholder="5"
+                      defaultValue={run?.distance.toLocaleString("pt-BR", { useGrouping: false, maximumFractionDigits: 3 })}
+                      placeholder="4,2"
                     />
                   </Field>
                   <Field label="Duração (min)">
                     <input
                       name="minutes"
-                      type="number"
+                      type="text"
                       inputMode="decimal"
-                      step="0.01"
-                      min="0.02"
-                      max="10080"
+                      pattern="[0-9]+([,.][0-9]{1,3})?"
                       required
                       defaultValue={
                         run ? Number((run.seconds / 60).toFixed(2)) : undefined
@@ -1198,10 +1195,9 @@ export default function App() {
                   <Field label="Corrida semanal (km)">
                     <input
                       name="weeklyKm"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      max="1000"
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]+([,.][0-9]{1,3})?"
                       required
                       defaultValue={data.settings.weeklyKm}
                     />

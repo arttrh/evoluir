@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export function parseDecimal(value: string): number {
+  const normalized = value.trim();
+  if (!/^\d+(?:[,.]\d{1,3})?$/.test(normalized))
+    throw new Error("Use um número como 4,1 ou 4.2, sem separador de milhares.");
+  return Number(normalized.replace(",", "."));
+}
+
 export const areas = ["corpo", "estudos", "emprego"] as const;
 export const jobStatuses = [
   "Encontrada",

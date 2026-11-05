@@ -2511,3 +2511,14 @@ dialog[open] {
 .learning-session ul { padding-left: 20px; }
 .learning-session li { margin: 8px 0; }
 .learning-session li small { display: inline-block; margin-left: 8px; color: var(--muted, #68665e); }
+
+.news-source-note { margin: 0 0 16px; border-block: 1px solid var(--line, #dedbd3); }
+.news-source-note a { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; font-size: 13px; text-underline-offset: 4px; }
+.news-source-note svg { flex-shrink: 0; }
+.news-page .news-card { background: #fff; border: 1px solid #e5e0d7; box-shadow: none; border-radius: 12px; }
+.news-page .news-featured { background: #f5f1e9; }
+.news-page .news-card-meta, .news-page .news-card-footer, .news-page .news-updated, .news-page .news-disclosure { font-size: 12px; }
+.news-page .news-card-meta > span { letter-spacing: 0; text-transform: none; }
+.news-page .news-categories button { font-size: 12px; min-height: 44px; }
+
+.news-page .news-card-meta { color: #6b5c48; }
