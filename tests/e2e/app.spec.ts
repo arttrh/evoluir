@@ -573,9 +573,6 @@ test("Strava exibe métricas autenticadas sem persistir atividades em backup", a
     }),
   );
   await nav(page, "Corrida");
-  await page
-    .getByRole("button", { name: "Consultar corridas", exact: true })
-    .click();
   await expect(
     page.getByRole("heading", { name: "Corrida externa de teste" }),
   ).toBeVisible();
@@ -592,11 +589,15 @@ test("Strava exibe métricas autenticadas sem persistir atividades em backup", a
   await expect(
     page.getByRole("heading", { name: "Corrida externa de teste" }),
   ).not.toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
   await nav(page, "Hoje");
   await nav(page, "Corrida");
   await expect(
     page.getByRole("heading", { name: "Corrida externa de teste" }),
-  ).not.toBeVisible();
+  ).toBeVisible();
 });
 
 test("movimento reduzido mantém as telas visíveis e desativa animações", async ({

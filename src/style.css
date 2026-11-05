@@ -2539,3 +2539,5 @@ dialog[open] {
 .study-failed-source-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .study-failed-source-links a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 13px; }
 .study-failed-source-links a { color: #403c35; text-underline-offset: 3px; }
+
+.strava-completed { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 13px; color: #403c35; }

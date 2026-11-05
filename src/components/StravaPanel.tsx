@@ -1,23 +1,25 @@
-import { useEffect, useState } from "react";
-import { ArrowUpRight, RefreshCw, Link2, Unplug, Activity } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, RefreshCw, Link2, Unplug, Activity, CircleCheck } from "lucide-react";
 import { z } from "zod";
 import { duration, pace } from "../model";
 const responseSchema = z.object({
   activities: z.array(
     z.object({
-      id: z.number(),
+      id: z.number().int().positive(),
       name: z.string(),
       distance: z.number(),
       movingTime: z.number(),
       elapsedTime: z.number(),
-      date: z.string(),
+      date: z.iso.datetime(),
       elevation: z.number().nullable(),
       heartRate: z.number().nullable(),
       device: z.string().nullable(),
       url: z.string().url(),
     }),
-  ),
+  ).max(100),
+  checkedAt: z.iso.datetime().optional(),
 });
+const visible = (): boolean => document.visibilityState === "visible";
 export function StravaPanel() {
   const [status, setStatus] = useState<{
     configured: boolean;
@@ -30,9 +32,12 @@ export function StravaPanel() {
   const [error, setError] = useState("");
   const [consent, setConsent] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [checkedAt, setCheckedAt] = useState("");
+  const request = useRef<AbortController | null>(null);
+  const revoking = useRef(false);
   useEffect(() => {
     let active = true;
-    fetch("/api/strava?op=status", { cache: "no-store" })
+    fetch("/api/strava?op=status", { cache: "no-store", signal: AbortSignal.timeout(20000) })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -51,24 +56,19 @@ export function StravaPanel() {
       active = false;
     };
   }, []);
-  useEffect(() => {
-    const clear = () => {
-      if (document.visibilityState === "hidden") setActivities([]);
-    };
-    document.addEventListener("visibilitychange", clear);
-    const expiry = setInterval(() => setActivities([]), 300000);
-    return () => {
-      document.removeEventListener("visibilitychange", clear);
-      clearInterval(expiry);
-    };
-  }, []);
-  async function load() {
+  const load = useCallback(async () => {
+    if (!visible() || revoking.current) return;
+    request.current?.abort();
+    const abort = new AbortController();
+    request.current = abort;
     setBusy(true);
     setError("");
     try {
       const response = await fetch("/api/strava?op=activities", {
         cache: "no-store",
+        signal: AbortSignal.any([abort.signal, AbortSignal.timeout(20000)]),
       });
+      if (abort.signal.aborted) return;
       if (!response.ok) {
         const body = await response.json();
         if (response.status === 401) {
@@ -82,20 +82,49 @@ export function StravaPanel() {
         );
       }
       const data = responseSchema.parse(await response.json());
-      if (document.visibilityState !== "hidden") setActivities(data.activities);
+      if (!abort.signal.aborted && visible()) {
+        setActivities([...new Map(data.activities.map(activity => [activity.id, activity])).values()]);
+        setCheckedAt(data.checkedAt || new Date().toISOString());
+      }
     } catch (e) {
+      if (abort.signal.aborted) return;
       setActivities([]);
+      setCheckedAt("");
       setError(e instanceof Error ? e.message : "Não foi possível consultar.");
     } finally {
-      setBusy(false);
+      if (!abort.signal.aborted) setBusy(false);
     }
-  }
+  }, []);
+  useEffect(() => {
+    if (!status?.connected) return;
+    const synchronize = () => {
+      if (!visible()) {
+        request.current?.abort();
+        setActivities([]);
+        setCheckedAt("");
+        if (!revoking.current) setBusy(false);
+      } else void load();
+    };
+    void load();
+    document.addEventListener("visibilitychange", synchronize);
+    const timer = setInterval(() => { if (visible()) void load(); }, 300000);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", synchronize);
+      request.current?.abort();
+    };
+  }, [status?.connected, load]);
   async function disconnect() {
+    revoking.current = true;
+    request.current?.abort();
+    setActivities([]);
+    setCheckedAt("");
     setBusy(true);
     setError("");
     try {
       const response = await fetch("/api/strava?op=disconnect", {
         method: "POST",
+        signal: AbortSignal.timeout(20000),
       });
       if (!response.ok)
         throw new Error(
@@ -105,13 +134,14 @@ export function StravaPanel() {
       setStatus({ configured: true, connected: false });
       setDisconnecting(false);
       setError(
-        "Conexão revogada. Nenhuma atividade do Strava foi salva no Prumo.",
+        "Conexão revogada. As corridas do Strava foram removidas desta tela; seus registros manuais foram preservados.",
       );
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Não foi possível desconectar.",
       );
     } finally {
+      revoking.current = false;
       setBusy(false);
     }
   }
@@ -120,7 +150,7 @@ export function StravaPanel() {
       <div className="section-heading">
         <div>
           <span className="eyebrow">Seus dados de corrida</span>
-          <h2>Nike Run Club + Strava</h2>
+          <h2>Corridas realizadas no Strava</h2>
         </div>
         <span className="explorer-icon">
           <Activity size={23} />
@@ -130,19 +160,20 @@ export function StravaPanel() {
         Conecte o NRC ao Strava para enviar as próximas corridas. O histórico
         anterior não é transferido por essa conexão.
       </p>
-      {status?.connected ? (
+      {status === null ? <p role="status" className="small muted">{error ? "Atualize a página para verificar sua conexão novamente." : "Verificando sua conexão Strava…"}</p> : status.connected ? (
         <>
           <div className="connected-badge">
             <span className="status-dot" />
-            Strava conectado · consulta privada
+            Strava conectado · atualização automática
           </div>
           <div className="inline-actions">
-            <button className="button" disabled={busy} onClick={load}>
+            <button className="button" disabled={busy} onClick={() => void load()}>
               <RefreshCw size={16} className={busy ? "spin" : ""} />
-              {busy ? "Consultando" : "Consultar corridas"}
+              {busy ? "Consultando" : "Atualizar corridas"}
             </button>
             <button
               className="text-button"
+              disabled={busy}
               onClick={() => setDisconnecting((v) => !v)}
             >
               <Unplug size={15} />
@@ -161,8 +192,11 @@ export function StravaPanel() {
               </button>
             </div>
           )}
+          {busy && <p role="status" className="small muted">Atualizando suas corridas…</p>}
+          {checkedAt && <p className="small muted">Última atualização: <time dateTime={checkedAt}>{new Date(checkedAt).toLocaleString("pt-BR")}</time></p>}
           {activities.map((a) => (
             <article className="external-run" key={a.id}>
+              <span className="strava-completed"><CircleCheck size={15} /> Realizada no Strava</span>
               <div className="section-heading">
                 <h3>{a.name}</h3>
                 <a
@@ -211,10 +245,9 @@ export function StravaPanel() {
               </a>
             </article>
           ))}
-          {activities.length === 0 && !busy && (
+          {activities.length === 0 && !busy && !error && checkedAt && (
             <p className="small muted">
-              Consulte para ver as corridas entre suas 100 atividades mais
-              recentes.
+              Nenhuma corrida encontrada entre suas 100 atividades mais recentes no Strava.
             </p>
           )}
         </>
@@ -289,8 +322,9 @@ export function StravaPanel() {
         </p>
       )}
       <p className="integration-privacy">
-        As atividades consultadas ficam apenas na memória desta tela. Não entram
-        nos backups nem alteram suas metas locais.{" "}
+        Suas corridas aparecem automaticamente ao abrir esta tela e ao voltar
+        para ela. Enquanto a tela estiver visível, a consulta é atualizada a cada cinco minutos.
+        Os dados do Strava não entram no backup nem alteram suas metas manuais.{" "}
         <a href="/privacy.html" target="_blank" rel="noopener noreferrer">
           Privacidade
         </a>{" "}
