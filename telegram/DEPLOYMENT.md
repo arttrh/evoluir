@@ -1,5 +1,13 @@
 # Publicação do bot de vagas
 
+## Conexão Gupy confirmada — 2026-11-05
+
+A verificação da conta real falhava com 500 na Gupy, apresentado como 503 pelo serviço. Com a mesma sessão e o mesmo endpoint, a requisição sem contexto de login retornou 500; com `Origin` e `Referer` do login retornou 200 e identificação de conta. O cliente foi alterado para Firefox isolado via BiDi, e a sessão cifrada passou a ser preservada em falhas temporárias.
+
+O código `0a2cc63` foi publicado no deploy `dep-dbm9o8142hec73e2nbsg`, confirmado `live`. A retomada do artefato cifrado concluiu a verificação no servidor, persistiu `gupy.status=connected` às `2026-11-05T15:10:38.260Z` e enviou a confirmação ao Telegram. A sessão pendente local foi removida após a confirmação. Não foi necessário outro login.
+
+`npm run check`: 205 testes, TypeScript e build passaram. Os testes adicionais cobrem preservação e retomada do artefato em erro 503, abertura explícita de novo login sem apagar o anterior e o contexto HTTP exigido pela Gupy. O atalho local usa Kitty com `--hold` para manter erros visíveis. A sessão pode expirar; ainda não há renovação automática. Esta confirmação não implementa envio de candidaturas.
+
 ## Busca pública e conexão supervisionada Gupy — 2026-11-05
 
 A busca pública foi publicada em `4495555`, deploy `dep-dbm983l6e07s73bhjll0` no estado `live`. O cron foi reativado em `*/30 * * * *`. O primeiro disparo real retornou 200, enviou sete avisos novos e uma seleção de interesse já foi persistida pela conta vinculada. O perfil ainda não contém sessão autenticada da Gupy; a conexão pessoal continua aguardando login supervisionado. Nenhuma inscrição foi enviada.
