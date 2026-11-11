@@ -30,7 +30,20 @@ export const stateSchema = z.object({
   entries: z.record(z.string(), entrySchema).default({}),
   gupy: z.object({ status: z.enum(["connected", "expired"]), verifiedAt: z.string().datetime() }).optional(),
   flow: flowSchema.prefault({}),
+  // Contadores do dia (horário de Brasília) para o resumo diário: deixam claro que o bot está ativo mesmo sem vagas novas.
+  daily: z.object({ day: z.string(), scans: z.number().int().nonnegative(), found: z.number().int().nonnegative(),
+    sent: z.number().int().nonnegative(), errors: z.number().int().nonnegative(), reportedDay: z.string().default("") }).optional(),
 });
+export const summaryHour = 21;
+export function brasiliaDay(now: number) {
+  const local = new Date(now - 3 * 3600000);
+  return { day: local.toISOString().slice(0, 10), hour: local.getUTCHours() };
+}
+const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+export function recruiterEmails(text: string) {
+  return [...new Set((text.match(emailPattern) || []).map(email => email.toLowerCase().replace(/\.$/, "")))]
+    .filter(email => !/^(no-?reply|nao-?responda|donotreply)@/.test(email) && !/@(gupy\.io|example\.com)$/.test(email)).slice(0, 3);
+}
 const userSchema = z.object({ id: z.number().int().positive() });
 const messageSchema = z.object({
   chat: z.object({ id: z.number().int(), type: z.string() }),
@@ -115,7 +128,13 @@ export class TelegramWorker {
         text: "Olá! O bot está online. Para acessar seu perfil, abra o link privado de vinculação recebido na conversa em que você configurou o bot e toque em Iniciar. O /start sozinho não autoriza acesso ao currículo. Não envie senhas aqui." });
     } else if (message?.chat.type === "private" && message.chat.id === this.state.chatId
         && message.from?.id === this.state.userId) {
-      if (message.text === "/pausar") { this.state.paused = true; await this.save(); await this.message("Avisos pausados. Use /retomar para continuar."); }
+      if (message.text === "/buscar") {
+        const result = await this.scan(Date.now(), true);
+        await this.message(result
+          ? `Busca feita agora: ${result.found} vagas compatíveis na Gupy, ${result.sent} novas avisadas.${result.sent ? "" : " Nada novo desde o último aviso."}`
+          : "Busca indisponível: confirme que a conta está vinculada e os avisos não estão pausados (/retomar).");
+      }
+      else if (message.text === "/pausar") { this.state.paused = true; await this.save(); await this.message("Avisos pausados. Use /retomar para continuar."); }
       else if (message.text === "/retomar") {
         if (this.cloud && !this.cloud.profile?.applicationSources?.includes("Gupy")) await this.message("Nenhuma fonte de vagas conectada. Fontes antigas continuam suspensas.");
         else { this.state.paused = false; await this.save(); await this.message(this.cloud ? "Avisos da busca pública da Gupy retomados. Use /candidaturas para revisar inscrições; LinkedIn ainda não conectado." : "Avisos retomados."); }
@@ -123,6 +142,10 @@ export class TelegramWorker {
       else if (message.text === "/perfil" && this.cloud?.profile) {
         const profile = this.cloud.profile;
         await this.message(`Currículo Evoluir: ${profile.resumeSource.split("/").pop()}\n\nLinkedIn: ${profile.links.linkedin}\nGitHub: ${profile.links.github}\nPortfólio: ${profile.links.portfolio}\n\nUse /cadastro para documentos e salários; /candidaturas para revisar cada vaga. A Gupy usa o currículo cadastrado nela; o PDF acima não o substitui automaticamente.`);
+      }
+      else if (/^\/email(?:\s|$)/.test(message.text || "") && this.cloud?.flow) {
+        try { await this.cloud.flow("email", message.text!.slice(6).trim()); }
+        catch { await this.message("Não foi possível preparar o e-mail. Use: /email recrutador@empresa.com Título da vaga"); }
       }
       else if (["/cadastro", "/candidaturas", "/pendencias", "/sincronizar"].includes(message.text || "") && this.cloud?.flow) {
         try { await this.cloud.flow(message.text!.slice(1)); }
@@ -135,7 +158,7 @@ export class TelegramWorker {
       }
       else if (message.text === "/status" || message.text?.startsWith("/start")) {
         await this.message(this.cloud
-          ? `Java júnior e estágio · Gupy pública · ${this.state.paused ? "avisos pausados" : "avisos a cada 30 minutos"}.\nÚltima busca: ${this.state.lastSearch ? new Date(this.state.lastSearch).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "aguardando"}.\n\n/cadastro: documentos e salários em privado\n/candidaturas: revisar e aprovar por vaga\n/pendencias: testes e próximas etapas\n/gupy: sessão da conta\n\nLinkedIn ainda não conectado. GitHub não é usado na busca da nuvem.`
+          ? `Java júnior e estágio · Gupy pública · ${this.state.paused ? "avisos pausados" : "busca a cada 30 minutos, resumo diário às 21h"}.\nÚltima busca: ${this.state.lastSearch ? new Date(this.state.lastSearch).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "aguardando"}.\nHoje: ${this.state.daily?.day === brasiliaDay(Date.now()).day ? `${this.state.daily.scans} buscas, ${this.state.daily.sent} vagas novas` : "nenhuma busca ainda"}.\n\n/buscar: procurar vagas agora\n/candidaturas: vagas selecionadas e candidatura em 1 toque\n/email: enviar currículo por e-mail\n/cadastro: documentos e salários em privado\n/pendencias: testes e próximas etapas\n/gupy: sessão da conta\n\nLinkedIn ainda não conectado.`
           : `Java júnior e estágio · a cada ${this.config.intervalMinutes} minutos · ${this.state.paused ? "pausado" : "ativo"}.\nÚltima busca: ${this.state.lastSearch ? new Date(this.state.lastSearch).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "aguardando"}.\nVagas selecionadas: ${Object.values(this.state.entries).filter(e => e.status === "interesse").length}.\nEnvio de currículo ainda não configurado.`);
       }
     }
@@ -143,7 +166,7 @@ export class TelegramWorker {
     if (callback) {
       let text = "Ação não autorizada ou vaga indisponível.";
       const match = /^(interesse|ignorada):([a-f0-9]{24})$/.exec(callback.data || "");
-      const flow = /^(preparar|cancelar|aprovar):([a-f0-9]{24}(?::[a-f0-9]{16})?)$/.exec(callback.data || "");
+      const flow = /^(preparar|candidatar|cancelar|aprovar|email|enviar|descartar):([a-f0-9]{24}(?::[a-f0-9]{16})?)$/.exec(callback.data || "");
       const owner = callback.from.id === this.state.userId && callback.message?.chat.type === "private"
         && callback.message.chat.id === this.state.chatId;
       if (owner && flow && this.cloud?.flow) {
@@ -167,12 +190,31 @@ export class TelegramWorker {
     await this.save();
   }
 
-  async scan(now = Date.now()) {
-    if (!this.state.chatId || this.state.paused || now - this.state.lastSearch < this.config.intervalMinutes * 60000) return;
+  daily(now: number) {
+    const { day } = brasiliaDay(now);
+    if (this.state.daily?.day !== day) this.state.daily = { day, scans: 0, found: 0, sent: 0, errors: 0, reportedDay: this.state.daily?.reportedDay || "" };
+    return this.state.daily;
+  }
+
+  async summary(now: number) {
+    const { day, hour } = brasiliaDay(now);
+    const daily = this.daily(now);
+    if (!this.cloud || hour < summaryHour || daily.reportedDay === day) return;
+    daily.reportedDay = day;
+    await this.save();
+    const pending = Object.values(this.state.entries).filter(e => e.status === "interesse").length;
+    await this.message(`Resumo de hoje (${day.split("-").reverse().join("/")})\n\n${daily.scans} buscas na Gupy · ${daily.found} vagas Java júnior/estágio abertas · ${daily.sent} novas avisadas hoje${daily.errors ? ` · ${daily.errors} buscas com falha da Gupy` : ""}.\n${daily.sent ? "" : "Nenhuma vaga nova hoje; o bot continua buscando a cada 30 minutos.\n"}${pending ? `\n${pending} vaga(s) marcadas com interesse. Use /candidaturas para se candidatar em 1 toque.` : ""}`);
+  }
+
+  async scan(now = Date.now(), force = false) {
+    if (!this.state.chatId || this.state.paused || !force && now - this.state.lastSearch < this.config.intervalMinutes * 60000) return;
     const vacancies = new Map<string, Vacancy | GupyVacancy>();
     if (this.cloud) {
       if (!this.cloud.profile?.applicationSources?.includes("Gupy")) return;
-      for (const vacancy of await searchGupyJobs()) if (matchesJavaEntry(vacancy)) vacancies.set(vacancy.url, vacancy);
+      let found;
+      try { found = await searchGupyJobs(); }
+      catch (error) { this.daily(now).errors++; await this.save(); throw error; }
+      for (const vacancy of found) if (matchesJavaEntry(vacancy)) vacancies.set(vacancy.url, vacancy);
     } else {
       // As variantes evitam combinar júnior e estágio como requisitos simultâneos.
       for (const q of ["Java junior", "Java júnior", "Java estágio", "Java estagiário"]) {
@@ -188,18 +230,26 @@ export class TelegramWorker {
       // shortcut: entrega incerta não é reenviada automaticamente, revisar o estado se houver falha de rede.
       this.state.entries[id] = { vacancy, status: "notificando", at: new Date().toISOString() };
       await this.save();
-      await this.message(`Nova vaga de Java\n\n${vacancy.title}\n${vacancy.source} · ${vacancy.publishedAt.slice(0, 10)}\n${vacancy.labels.join(" · ")}\n\n${vacancy.description.slice(0, 2200)}\n\nConfira os requisitos no anúncio. Selecionar não envia currículo.`, {
+      const emails = recruiterEmails(vacancy.description);
+      const oneTap = this.cloud?.flow && vacancy.source === "Gupy";
+      await this.message(`Nova vaga de Java\n\n${vacancy.title}\n${vacancy.source} · ${vacancy.publishedAt.slice(0, 10)}\n${vacancy.labels.join(" · ")}\n\n${vacancy.description.slice(0, 2200)}\n\n${oneTap ? "Candidatar mostra um resumo antes; nada é enviado sem sua confirmação." : "Confira os requisitos no anúncio. Selecionar não envia currículo."}`, {
         inline_keyboard: [[{ text: "Ver anúncio", url: vacancy.url }],
-          [{ text: "Tenho interesse", callback_data: `interesse:${id}` }, { text: "Ignorar", callback_data: `ignorada:${id}` }]],
+          oneTap ? [{ text: "Candidatar na Gupy", callback_data: `candidatar:${id}` }, { text: "Ignorar", callback_data: `ignorada:${id}` }]
+            : [{ text: "Tenho interesse", callback_data: `interesse:${id}` }, { text: "Ignorar", callback_data: `ignorada:${id}` }],
+          ...(this.cloud?.flow && emails.length ? [[{ text: `Enviar currículo para ${emails[0]}`, callback_data: `email:${id}` }]] : [])],
       });
       this.state.entries[id].status = "notificada";
       await this.save();
       sent++;
       await delay(1100);
     }
-    this.state.lastSearch = now;
+    if (!force) this.state.lastSearch = now;
+    const daily = this.daily(now);
+    daily.scans++; daily.found = vacancies.size; daily.sent += sent;
     await this.save();
     console.log(`Busca concluída: ${vacancies.size} vagas compatíveis, ${sent} avisos novos.`);
+    await this.summary(now);
+    return { found: vacancies.size, sent };
   }
 
   async run() {

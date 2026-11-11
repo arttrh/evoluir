@@ -14,8 +14,21 @@ it("consulta o portal público sem credencial ou sessão do candidato", async ()
   expect(items).toHaveLength(1);
   expect(items[0]).toMatchObject({ source: "Gupy", title: "Java Júnior", url: job.jobUrl });
   expect(items[0].description).not.toContain("<p>");
-  expect(fetch).toHaveBeenCalledWith("https://portal.gupy.io/api/job-search/jobs?jobName=java&limit=100&offset=0",
+  expect(fetch).toHaveBeenCalledWith("https://portal.gupy.io/api/job-search/jobs?jobName=java&limit=100&offset=0&sortBy=publishedDate&sortOrder=desc",
     expect.objectContaining({ redirect: "error", headers: { Accept: "application/json", "User-Agent": "evoluir-job-alerts" } }));
+});
+it("consulta vários termos, junta sem duplicar e descarta anúncios antigos", async () => {
+  const now = Date.parse("2026-11-11T12:00:00.000Z");
+  const estagio = { ...job, name: "Estágio em Desenvolvimento", jobUrl: "https://outra.gupy.io/jobs/7", publishedDate: "2026-11-10T00:00:00.000Z" };
+  const antiga = { ...job, name: "Java Jr antiga", jobUrl: "https://velha.gupy.io/jobs/8", publishedDate: "2026-07-01T00:00:00.000Z" };
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(Response.json({ data: [{ ...job, publishedDate: "2026-11-09T00:00:00.000Z" }, antiga], pagination: { total: 2 } }))
+    .mockResolvedValueOnce(new Response("", { status: 503 }))
+    .mockResolvedValueOnce(Response.json({ data: [estagio, { ...job, publishedDate: "2026-11-09T00:00:00.000Z" }], pagination: { total: 2 } }));
+  vi.stubGlobal("fetch", fetch);
+  const items = await searchGupyJobs(["java", "java junior", "estágio desenvolvimento"], now);
+  expect(items.map(item => item.title).sort()).toEqual(["Estágio em Desenvolvimento", "Java Júnior"]);
+  expect(fetch).toHaveBeenCalledTimes(3);
 });
 it("descarta anúncios vencidos, dados inválidos e destinos fora da Gupy", async () => {
   results([job,

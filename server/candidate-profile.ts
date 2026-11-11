@@ -58,10 +58,18 @@ export const applicationSchema = z.object({
   reviewedHash: z.string().optional(),
   applicationId: z.number().int().positive().optional(), registerStepId: z.number().int().positive().optional(),
   tasks: z.array(taskSchema).default([]), checkedAt: z.string().optional(), remindedAt: z.number().default(0),
+  // Candidatura em 1 toque: a confirmação no Telegram cobre início e conclusão do cadastro.
+  oneTap: z.boolean().optional(), error: z.string().max(80).optional(),
+});
+export const emailDraftSchema = z.object({
+  to: z.email().max(254), subject: z.string().max(200), body: z.string().max(4000),
+  status: z.enum(["draft", "sending", "sent", "failed"]), nonce: z.string().regex(/^[a-f0-9]{16}$/),
+  expiresAt: z.number(), sentAt: z.string().optional(), error: z.string().max(80).optional(),
 });
 export const flowSchema = z.object({
   vault: sealedGupySchema.optional(), version: z.number().int().nonnegative().default(0),
   portal: z.object({ ticketHash: z.string(), ticketUntil: z.number(), sessionHash: z.string().optional(), sessionUntil: z.number().optional() }).optional(),
   applications: z.record(z.string(), applicationSchema).default({}),
+  emails: z.record(z.string(), emailDraftSchema).default({}),
 });
 export type FlowState = z.infer<typeof flowSchema>;

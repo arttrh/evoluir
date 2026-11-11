@@ -206,3 +206,32 @@ it("limita a dez avisos por rodada e deixa os demais para a próxima", async () 
   await bot.scan(now + 30 * 60000);
   expect(Object.keys(bot.state.entries)).toHaveLength(11);
 });
+it("nuvem: resumo diário às 21h de Brasília, uma vez por dia, mesmo sem vaga nova", async () => {
+  const persist = vi.fn().mockResolvedValue(undefined);
+  const bot = new TelegramWorker({ ...config, tokenFile: "unused" }, "", { state: { chatId: 123, userId: 123 }, persist,
+    profile: { resumeSource: "x.pdf", links: { github: "", linkedin: "", portfolio: "" }, applicationSources: ["Gupy"] } });
+  vi.spyOn(bot, "api").mockResolvedValue(true);
+  vi.mocked(searchGupyJobs).mockResolvedValue([]);
+  const texts = () => vi.mocked(bot.api).mock.calls.map(([, body]) => String(body?.text));
+  const evening = Date.parse("2026-11-11T23:00:00.000Z"); // 20h em Brasília
+  await bot.scan(evening);
+  expect(texts().some(t => t.startsWith("Resumo de hoje"))).toBe(false);
+  await bot.scan(evening + 30 * 60000); await bot.scan(evening + 60 * 60000); // 20h30 e 21h
+  await bot.scan(evening + 90 * 60000);
+  const summaries = texts().filter(t => t.startsWith("Resumo de hoje (11/11/2026)"));
+  expect(summaries).toHaveLength(1);
+  expect(summaries[0]).toContain("3 buscas na Gupy");
+  expect(summaries[0]).toContain("Nenhuma vaga nova hoje");
+});
+it("nuvem: vaga da Gupy oferece candidatura em 1 toque e e-mail quando o anúncio informa contato", async () => {
+  const bot = new TelegramWorker({ ...config, tokenFile: "unused" }, "", { state: { chatId: 123, userId: 123 }, persist: vi.fn().mockResolvedValue(undefined),
+    profile: { resumeSource: "x.pdf", links: { github: "", linkedin: "", portfolio: "" }, applicationSources: ["Gupy"] }, flow: vi.fn() });
+  vi.spyOn(bot, "api").mockResolvedValue(true);
+  vi.mocked(searchGupyJobs).mockResolvedValue([{ ...vacancy, source: "Gupy", url: "https://empresa.gupy.io/jobs/9",
+    description: "Java. Envie currículo para vagas@empresa.com.br ou noreply@empresa.com" }]);
+  await bot.scan(Date.now());
+  const markup = JSON.stringify(vi.mocked(bot.api).mock.calls.find(([, body]) => String(body?.text).startsWith("Nova vaga"))?.[1]?.reply_markup);
+  expect(markup).toContain("candidatar:");
+  expect(markup).toContain("vagas@empresa.com.br");
+  expect(markup).not.toContain("noreply");
+});

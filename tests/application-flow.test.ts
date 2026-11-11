@@ -21,6 +21,8 @@ function setup() {
   const start = vi.spyOn(client, "start").mockResolvedValue({ applicationId: 100, registerStepId: 200 });
   const complete = vi.spyOn(client, "complete").mockResolvedValue(null);
   vi.spyOn(client, "registration").mockResolvedValue({ schema: {}, additional: {}, questions: [] });
+  vi.spyOn(client, "applications").mockResolvedValue([]);
+  vi.spyOn(client, "saveAdditional").mockResolvedValue(null);
   vi.spyOn(client, "details").mockResolvedValue({ registrationComplete: false, job: { id: 42, jobSteps: [
     { id: 10, name: "Cadastro", type: "register", applicationStep: { id: 200, status: "not-started" } },
     { id: 11, name: "Raciocínio lógico", type: "online", applicationStep: { id: 201, status: "not-started" } },
@@ -61,7 +63,75 @@ it("timeout após POST não repete a inscrição e resultado parcial não vira e
   await flow.prepare(id); const app = bot.state.flow.applications[id];
   await flow.reviewed(id, app.snapshotHash!); start.mockRejectedValue(new Error("network"));
   await flow.approve(`${id}:${app.nonce}`); await flow.prepare(id);
-  expect(app.status).toBe("unknown"); expect(start).toHaveBeenCalledTimes(1);
+  // Sem inscrição na conta, o resultado deixa de ser incerto e a vaga pode ser tentada de novo, sem repetir sozinho.
+  expect(app.status).toBe("cancelled"); expect(app.error).toBe("network_or_timeout"); expect(start).toHaveBeenCalledTimes(1);
+});
+const lastText = (bot: TelegramWorker) => String(vi.mocked(bot.api).mock.calls.at(-1)?.[1]?.text);
+const buttons = (bot: TelegramWorker) => JSON.stringify(vi.mocked(bot.api).mock.calls.at(-1)?.[1]?.reply_markup);
+it("1 toque: o resumo não envia nada; uma confirmação inicia e conclui o cadastro", async () => {
+  const { flow, bot, start, complete, client } = setup();
+  bot.state.gupy = { status: "connected", verifiedAt: "2026-11-05T00:00:00.000Z" };
+  await flow.command("candidatar", id);
+  expect(start).not.toHaveBeenCalled();
+  expect(lastText(bot)).toContain("Confirmar candidatura?");
+  const app = bot.state.flow.applications[id];
+  expect(buttons(bot)).toContain(`aprovar:${id}:${app.nonce}`);
+  vi.mocked(client.details).mockResolvedValueOnce({ registrationComplete: false, job: { id: 42, jobSteps: [{ id: 10, name: "Cadastro", type: "register", applicationStep: { id: 200, status: "not-started" } }] } })
+    .mockResolvedValue({ registrationComplete: true, job: { id: 42, jobSteps: [] } });
+  await flow.approve(`${id}:${app.nonce}`);
+  expect(start).toHaveBeenCalledTimes(1); expect(complete).toHaveBeenCalledWith(100, 200);
+  expect(app.status).toBe("sent"); expect(lastText(bot)).toContain("Candidatura enviada");
+  expect(await flow.approve(`${id}:${app.nonce}`)).toContain("vencida");
+  expect(start).toHaveBeenCalledTimes(1);
+});
+it("1 toque: pergunta da empresa sem resposta interrompe antes de concluir e avisa o que falta", async () => {
+  const { flow, bot, complete, client } = setup();
+  bot.state.gupy = { status: "connected", verifiedAt: "2026-11-05T00:00:00.000Z" };
+  vi.mocked(client.registration).mockResolvedValue({ schema: {}, additional: {}, questions: [{ title: "Por que esta empresa?", answer: null }] });
+  await flow.command("candidatar", id);
+  await flow.approve(`${id}:${bot.state.flow.applications[id].nonce}`);
+  expect(complete).not.toHaveBeenCalled();
+  expect(bot.state.flow.applications[id].status).toBe("pending");
+  expect(lastText(bot)).toContain("Por que esta empresa?");
+});
+it("candidatura travada como incerta é conferida na conta Gupy antes de liberar nova tentativa", async () => {
+  const { flow, bot, start, client } = setup();
+  bot.state.gupy = { status: "connected", verifiedAt: "2026-11-05T00:00:00.000Z" };
+  bot.state.flow.applications[id] = { status: "unknown", nonce: "f".repeat(16), expiresAt: 0, profileVersion: 0, tasks: [], remindedAt: 0 };
+  vi.mocked(client.applications).mockResolvedValueOnce([{ applicationId: 555, jobName: "Java Junior", careerPageSubdomain: "empresa" }]);
+  await flow.command("candidatar", id);
+  expect(bot.state.flow.applications[id]).toMatchObject({ applicationId: 555, registerStepId: 200 });
+  expect(start).not.toHaveBeenCalled();
+  bot.state.flow.applications[id] = { status: "unknown", nonce: "f".repeat(16), expiresAt: 0, profileVersion: 0, tasks: [], remindedAt: 0 };
+  await flow.command("candidatar", id);
+  expect(bot.state.flow.applications[id].status).toBe("review");
+  expect(lastText(bot)).toContain("Confirmar candidatura?");
+});
+it("e-mail: mostra o rascunho, só envia após confirmar, uma única vez, com o PDF", async () => {
+  const { flow, bot } = setup();
+  const send = vi.fn().mockResolvedValue(undefined);
+  const pdf = Buffer.from("%PDF-1.4 teste");
+  const mailing = new ApplicationFlow(bot, key, "https://bot.example", {}, { mailer: { send }, resume: async () => pdf,
+    links: { linkedin: "https://linkedin.com/in/x", github: "https://github.com/x", portfolio: "https://x.dev" } });
+  vi.spyOn(mailing, "candidate").mockReturnValue(candidateSchema.parse({ fullName: "Pessoa Teste" }));
+  await mailing.command("email", "rh@empresa.com.br Desenvolvedor Java Júnior");
+  expect(send).not.toHaveBeenCalled();
+  expect(lastText(bot)).toContain("Para: rh@empresa.com.br");
+  const [key24, draft] = Object.entries(bot.state.flow.emails)[0];
+  expect(await mailing.command("enviar", `${key24}:${"0".repeat(16)}`)).toContain("vencido");
+  await mailing.command("enviar", `${key24}:${draft.nonce}`);
+  await mailing.command("enviar", `${key24}:${draft.nonce}`);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(send.mock.calls[0][0]).toMatchObject({ to: "rh@empresa.com.br", pdf });
+  expect(send.mock.calls[0][0].text).toContain("https://github.com/x");
+  expect(bot.state.flow.emails[key24].status).toBe("sent");
+  expect(flow).toBeDefined();
+});
+it("e-mail: sem Gmail configurado não cria rascunho nem promete envio", async () => {
+  const { flow, bot } = setup();
+  await flow.command("email", "rh@empresa.com.br Desenvolvedor Java Júnior");
+  expect(lastText(bot)).toContain("não está configurado");
+  expect(Object.keys(bot.state.flow.emails)).toHaveLength(0);
 });
 it("alteração no currículo remoto impede usar uma aprovação antiga", async () => {
   const { flow, bot, client, start } = setup(); await flow.prepare(id);

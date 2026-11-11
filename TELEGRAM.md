@@ -1,5 +1,17 @@
 # Avisos pessoais de vagas pelo Telegram
 
+## Correções — 2026-11-11
+
+Diagnóstico em produção: cron ativo (última busca 15:00), webhook sem erros, sessão Gupy válida. Os sintomas vinham de três falhas:
+
+- **Busca sem novidades.** Uma consulta única (`java`, 100 itens fora de ordem) achou só 7 vagas desde 05/11; depois disso o bot ficava calado. Agora consulta 10 termos (`java`, `java junior`, `estágio desenvolvimento`, `desenvolvedor junior`, `backend`…) ordenados por data, descarta anúncios com mais de 60 dias e só falha se todos os termos falharem. Na Gupy aparecem ~2–4 vagas Java júnior/estágio novas por semana; não há vaga nova a cada 30 minutos.
+- **Silêncio parecia defeito.** Resumo diário às 21h (Brasília) com buscas, vagas abertas e novas. `/buscar` procura na hora; `/status` mostra os números do dia.
+- **Candidatura travada.** Uma falha ao iniciar marcava `unknown` para sempre. Agora o erro é registrado (`gupy_http_N`, `network_or_timeout`), a conta Gupy é consultada (`/selection-process/candidate/applications`) e, se a inscrição não existe, a vaga é liberada para nova tentativa — nunca reenvia às cegas.
+
+**Candidatura em 1 toque.** O aviso da vaga tem **Candidatar na Gupy**: o bot mostra vaga, empresa, currículo da Gupy e pretensão; **Confirmar candidatura** inicia e conclui o cadastro. Perguntas da empresa sem resposta e testes são avisados e ficam para o candidato. O fluxo antigo pela página privada continua disponível.
+
+**Currículo por e-mail.** Se o anúncio informa um e-mail de contato, aparece **Enviar currículo para …**; também `/email recrutador@empresa.com Título da vaga`. O bot mostra o e-mail completo (destinatário, assunto, texto, PDF anexo) e só envia após **Enviar**, uma única vez. Usa o Gmail do candidato via SMTP com senha de app: variáveis `GMAIL_USER` e `GMAIL_APP_PASSWORD` no Render. Sem elas, o envio fica desativado e o bot avisa. O nome completo vem de `/cadastro`.
+
 ## Escopo atual — 2026-11-05
 
 O usuário restringiu candidaturas a **LinkedIn com candidatura simplificada** e **Gupy**, mantendo Java júnior/estágio e a frequência desejada de 30 minutos. As contas e currículos nessas plataformas já estão preenchidos, mas não estão conectados ao serviço.

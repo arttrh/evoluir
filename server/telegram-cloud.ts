@@ -8,7 +8,20 @@ import { TelegramWorker, stateSchema, telegramConfigSchema } from "./telegram.js
 import { readBounded } from "./http.js";
 import { openGupySession, sealedGupySchema, verifyGupySession } from "./gupy-session.js";
 import { candidateSchema, digest, sealPrivate } from "./candidate-profile.js";
-import { ApplicationFlow } from "./application-flow.js";
+import { ApplicationFlow, type Mailer } from "./application-flow.js";
+import { createTransport } from "nodemailer";
+
+// Gmail com senha de app (Conta Google → Segurança → Senhas de app). Sem as duas variáveis, o envio fica desativado.
+export function gmailMailer(user: string, password: string, from: string): Mailer {
+  const transport = createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass: password },
+    connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000 });
+  return {
+    async send(message) {
+      await transport.sendMail({ from: `${from} <${user}>`, to: message.to, subject: message.subject, text: message.text,
+        attachments: [{ filename: "curriculo.pdf", content: message.pdf, contentType: "application/pdf" }] });
+    },
+  };
+}
 
 const settingsSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().regex(/^\d{6,}:[A-Za-z0-9_-]{30,}$/),
@@ -18,6 +31,8 @@ const settingsSchema = z.object({
   TELEGRAM_STORE_TOKEN: z.string().regex(/^[a-f0-9]{64}$/),
   TELEGRAM_STORE_URL: z.string().regex(/^https:\/\/[a-z0-9]+\.supabase\.co\/functions\/v1\/prumo-telegram-store$/),
   GUPY_SESSION_KEY: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  GMAIL_USER: z.email().optional(),
+  GMAIL_APP_PASSWORD: z.string().transform(value => value.replace(/\s/g, "")).pipe(z.string().regex(/^[a-z]{16}$/)).optional(),
   PUBLIC_ORIGIN: z.url().refine(value => new URL(value).origin === value && value.startsWith("https://")).default("https://prumo-telegram.onrender.com"),
   PORT: z.coerce.number().int().min(0).max(65535).default(10000),
 });
@@ -76,7 +91,21 @@ export async function startTelegramWeb(environment: NodeJS.ProcessEnv) {
           revision = z.number().int().positive().parse(saved.revision);
         },
       });
-      if (settings.GUPY_SESSION_KEY) flow = new ApplicationFlow(bot, settings.GUPY_SESSION_KEY, settings.PUBLIC_ORIGIN, acquired.profile?.gupySession);
+      if (settings.GUPY_SESSION_KEY) {
+        const resume = async () => {
+          const profile = await store({ op: "profile" });
+          const pdf = Buffer.from(z.string().max(4000000).parse(profile.resumeBase64), "base64");
+          if (pdf.subarray(0, 5).toString() !== "%PDF-") throw new Error("PDF indisponível.");
+          return pdf;
+        };
+        const created: ApplicationFlow = new ApplicationFlow(bot, settings.GUPY_SESSION_KEY, settings.PUBLIC_ORIGIN, acquired.profile?.gupySession, {
+          resume, links: acquired.profile?.links,
+          ...(settings.GMAIL_USER && settings.GMAIL_APP_PASSWORD ? { mailer: {
+            send: message => gmailMailer(settings.GMAIL_USER!, settings.GMAIL_APP_PASSWORD!, created.candidate().fullName || "Candidato").send(message),
+          } } : {}),
+        });
+        flow = created;
+      }
       if (visit) {
         if (!flow || !bot.state.userId) throw new Error("Cadastro indisponível.");
         return { result: await visit(bot, flow) };

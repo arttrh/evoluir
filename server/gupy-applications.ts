@@ -62,8 +62,20 @@ export class GupyApplications {
   }
 
   async start(jobId: number) {
-    return z.object({ applicationId: id, registerStepId: id }).parse(
-      await this.request("/selection-process/candidate/application", "POST", { jobId: id.parse(jobId), partnerName: "gupy_portal" }));
+    const raw = await this.request("/selection-process/candidate/application", "POST", { jobId: id.parse(jobId), partnerName: "gupy_portal" });
+    // A resposta já veio sem registerStepId; nesse caso a etapa de cadastro é lida da própria inscrição criada.
+    const receipt = z.object({ applicationId: id.optional(), id: id.optional(), registerStepId: id.optional() }).passthrough().parse(raw ?? {});
+    const applicationId = receipt.applicationId ?? receipt.id;
+    if (!applicationId) throw new Error("Comprovante de inscrição ausente.", { cause: "gupy_unexpected_shape" });
+    if (receipt.registerStepId) return { applicationId, registerStepId: receipt.registerStepId };
+    const details = await this.details(applicationId);
+    const register = details.job.jobSteps.find(step => step.type === "register" && step.applicationStep);
+    return { applicationId, registerStepId: register?.applicationStep?.id };
+  }
+
+  async applications() {
+    return z.object({ results: z.array(z.object({ applicationId: id, jobName: z.string(), careerPageSubdomain: z.string() }).passthrough()).max(500) })
+      .parse(await this.request("/selection-process/candidate/applications")).results;
   }
 
   async details(applicationId: number) {

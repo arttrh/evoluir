@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { TelegramWorker } from "./telegram.js";
+import { recruiterEmails, type TelegramWorker } from "./telegram.js";
 import { candidateSchema, digest, maskedCandidate, openPrivate, sealPrivate, type Candidate } from "./candidate-profile.js";
 import { GupyApplications, GupyRequestError, gupyTarget } from "./gupy-applications.js";
 
@@ -33,8 +33,18 @@ export function additionalPlan(profile: Candidate, title: string, fields: unknow
   return { values: plan, missing };
 }
 
+export type Mailer = { send(message: { to: string; subject: string; text: string; pdf: Buffer }): Promise<void> };
+type Extras = { mailer?: Mailer; resume?: () => Promise<Buffer>; links?: { github: string; linkedin: string; portfolio: string } };
+
+function failure(error: unknown) {
+  if (error instanceof GupyRequestError) return `gupy_http_${error.status}`;
+  const cause = error instanceof Error ? error.cause : undefined;
+  return typeof cause === "string" ? cause.slice(0, 80) : error instanceof z.ZodError ? "gupy_unexpected_shape" : "network_or_timeout";
+}
+const sameName = (a: string, b: string) => a.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase() === b.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase();
+
 export class ApplicationFlow {
-  constructor(readonly bot: TelegramWorker, readonly key: string, readonly origin: string, readonly session: unknown) {}
+  constructor(readonly bot: TelegramWorker, readonly key: string, readonly origin: string, readonly session: unknown, readonly extras: Extras = {}) {}
   get state() { return this.bot.state.flow; }
   candidate() { return this.state.vault ? candidateSchema.parse(openPrivate(this.state.vault, this.key, "candidate")) : candidateSchema.parse({}); }
   client() { return new GupyApplications(this.session, this.key); }
@@ -56,8 +66,8 @@ export class ApplicationFlow {
       if (!selected.length) await this.bot.message("Nenhuma vaga selecionada. Toque em Tenho interesse no aviso de uma vaga.");
       for (const [id, entry] of selected.slice(0, 15)) {
         const app = this.state.applications[id];
-        await this.bot.message(`${entry.vacancy.title}\n${app ? this.status(id) : "Aguardando preparação"}`, { inline_keyboard: [
-          [{ text: app?.applicationId ? "Revisar dados para concluir" : "Preparar candidatura", callback_data: `preparar:${id}` }],
+        await this.bot.message(`${entry.vacancy.title}\n${app ? this.status(id) : "Ainda não candidatado"}`, { inline_keyboard: [
+          [{ text: app?.applicationId ? "Concluir candidatura" : "Candidatar em 1 toque", callback_data: `candidatar:${id}` }],
           [{ text: "Abrir na Gupy", url: this.applicationUrl(id) }],
         ] });
       }
@@ -66,6 +76,15 @@ export class ApplicationFlow {
     } else if (action === "preparar" && data) {
       await this.prepare(data);
       return "Revisão preparada. Abra o cadastro privado.";
+    } else if (action === "candidatar" && data) {
+      return this.quick(data);
+    } else if (action === "email") {
+      return data && /^[a-f0-9]{24}$/.test(data) ? this.emailForVacancy(data) : this.emailCommand(data || "");
+    } else if (action === "enviar" && data) return this.sendEmail(data);
+    else if (action === "descartar" && data) {
+      const draft = this.state.emails[data];
+      if (draft?.status === "draft") { delete this.state.emails[data]; await this.bot.save(); return "E-mail descartado. Nada foi enviado."; }
+      return "Não há rascunho para descartar.";
     } else if (action === "aprovar" && data) return this.approve(data);
     else if (action === "cancelar" && data) {
       const app = this.state.applications[data];
@@ -130,6 +149,152 @@ export class ApplicationFlow {
     });
   }
 
+  // Confere na conta Gupy se uma inscrição de resultado incerto existe. Sem isso, uma falha de rede travava a vaga para sempre.
+  async reconcile(id: string) {
+    const app = this.state.applications[id];
+    if (!app || app.applicationId || !["unknown", "starting"].includes(app.status)) return;
+    const target = gupyTarget(this.bot.state.entries[id].vacancy);
+    const subdomain = new URL(target.origin).hostname.split(".")[0];
+    const existing = (await this.client().applications()).find(item => item.careerPageSubdomain === subdomain && sameName(item.jobName, target.title));
+    if (existing) {
+      app.applicationId = existing.applicationId;
+      const details = await this.client().details(existing.applicationId);
+      app.registerStepId = details.job.jobSteps.find(step => step.type === "register" && step.applicationStep)?.applicationStep?.id;
+      app.status = "pending"; await this.bot.save(); await this.refresh(id);
+    } else { app.status = "cancelled"; app.snapshot = undefined; await this.bot.save(); }
+  }
+
+  // Candidatura em 1 toque: mostra o resumo exato no Telegram; a confirmação seguinte inicia e conclui o cadastro.
+  async quick(id: string): Promise<string> {
+    const entry = this.bot.state.entries[id];
+    if (!entry || entry.vacancy.source !== "Gupy") return "Vaga indisponível.";
+    if (entry.status !== "interesse") { entry.status = "interesse"; await this.bot.save(); }
+    if (this.bot.state.gupy?.status !== "connected") {
+      await this.bot.message("A sessão da Gupy não está conectada. Use /gupy para reconectar e tente de novo; a vaga ficou salva em /candidaturas.");
+      return "Gupy desconectada.";
+    }
+    await this.reconcile(id);
+    const previous = this.state.applications[id];
+    if (previous && ["sent", "starting"].includes(previous.status)) {
+      await this.bot.message(`${entry.vacancy.title}\n${this.status(id)}\n${this.applicationUrl(id)}`); return "Já registrada.";
+    }
+    const target = gupyTarget(entry.vacancy);
+    const preview = await this.client().preview(target.jobId);
+    if (`https://${preview.job.company.subdomain}.gupy.io` !== target.origin) throw new Error("Destino da vaga não confirmado.");
+    const plan = additionalPlan(this.candidate(), target.title, preview.fields, { schema: {}, additional: {} });
+    const draft: ApplicationDraft = { phase: previous?.applicationId ? "complete" : "start", preview, missing: [] };
+    const hash = digest(draft);
+    this.state.applications[id] = {
+      ...previous, status: "review", nonce: randomBytes(8).toString("hex"), expiresAt: Date.now() + 30 * 60000,
+      profileVersion: this.state.version, snapshot: sealPrivate(draft, this.key, `draft:${id}`), snapshotHash: hash,
+      reviewedHash: hash, oneTap: true, error: undefined, tasks: previous?.tasks || [], remindedAt: previous?.remindedAt || 0,
+    };
+    await this.bot.save();
+    const profile = z.object({ profile: z.object({ firstName: z.string(), lastName: z.string(), email: z.string() }) }).safeParse(preview.curriculum);
+    const name = profile.success ? `${profile.data.profile.firstName} ${profile.data.profile.lastName}` : "seu perfil";
+    const salary = plan.values.applicationFieldsValues as { value: number }[] | undefined;
+    const app = this.state.applications[id];
+    await this.bot.message(`Confirmar candidatura?\n\n${target.title}\nEmpresa: ${preview.job.company.subdomain}\n\nCurrículo: o que está na sua conta Gupy (${name}).${salary?.length ? `\nPretensão salarial: R$ ${salary[0].value}` : ""}${plan.missing.length ? `\n\nFalta no /cadastro: ${plan.missing.join(", ")}. A empresa pode pedir isso; complete antes ou termine pela Gupy.` : ""}\n\nAo confirmar, o bot inicia a inscrição e conclui o cadastro. Perguntas da empresa sem resposta e testes ficam para você responder na Gupy.\nVale por 30 minutos.`, {
+      inline_keyboard: [[{ text: "Confirmar candidatura", callback_data: `aprovar:${id}:${app.nonce}` }], [{ text: "Cancelar", callback_data: `cancelar:${id}` }]],
+    });
+    return "Confira o resumo e confirme.";
+  }
+
+  // Depois do início confirmado em 1 toque, conclui o cadastro se nada depender de resposta pessoal.
+  async finishOneTap(id: string, fields: unknown) {
+    const app = this.state.applications[id];
+    const title = this.bot.state.entries[id].vacancy.title;
+    if (!app.applicationId || !app.registerStepId) {
+      await this.bot.message(`Inscrição iniciada: ${title}.\nA Gupy não informou a etapa de cadastro; conclua pela plataforma.\n${this.applicationUrl(id)}`); return;
+    }
+    const client = this.client();
+    const details = await client.details(app.applicationId);
+    if (details.registrationComplete) { await this.refresh(id); await this.bot.message(`Candidatura enviada: ${title}.\n${this.applicationUrl(id)}\n\nUse /pendencias para acompanhar testes e etapas.`); return; }
+    const register = details.job.jobSteps.find(step => step.type === "register" && step.applicationStep?.id === app.registerStepId);
+    if (!register) { await this.bot.message(`Inscrição iniciada: ${title}.\nConclua o cadastro pela Gupy.\n${this.applicationUrl(id)}`); return; }
+    const registration = await client.registration(app.applicationId, app.registerStepId, register.id);
+    const plan = additionalPlan(this.candidate(), title, fields, registration);
+    for (const question of registration.questions) {
+      const answer = question.answer ?? question.answers;
+      const selected = Array.isArray(question.options) && question.options.some(option => option && typeof option === "object" && "selected" in option && option.selected === true);
+      if ((answer === undefined || answer === null || answer === "" || Array.isArray(answer) && !answer.length) && !selected)
+        plan.missing.push(String(question.title || question.description || "Pergunta da empresa").slice(0, 200));
+    }
+    if (plan.missing.length) {
+      app.snapshot = undefined; await this.bot.save();
+      await this.bot.message(`Inscrição iniciada: ${title}.\n\nA empresa pede respostas suas antes de concluir:\n• ${plan.missing.join("\n• ")}\n\nResponda na Gupy para finalizar.\n${this.applicationUrl(id)}`); return;
+    }
+    if (digest(plan.values) !== digest(registration.additional)) await client.saveAdditional(app.applicationId, plan.values);
+    await client.complete(app.applicationId, app.registerStepId);
+    app.snapshot = undefined;
+    await this.refresh(id);
+    await this.bot.message(`${app.status === "sent" ? "Candidatura enviada" : "Cadastro enviado; aguardando confirmação da Gupy"}: ${title}.\n${this.applicationUrl(id)}\n\nUse /pendencias para acompanhar testes e etapas.`);
+  }
+
+  emailTemplate(title: string) {
+    const candidate = this.candidate();
+    const links = this.extras.links;
+    const name = candidate.fullName || "Candidato";
+    return {
+      subject: `Candidatura — ${title.slice(0, 120)} — ${name}`,
+      body: `Olá,\n\nTenho interesse na vaga de ${title.slice(0, 160)} e envio meu currículo em anexo.\n\nSou desenvolvedor focado em Java e busco uma oportunidade de júnior ou estágio para contribuir com a equipe e continuar evoluindo.\n${links ? `\nLinkedIn: ${links.linkedin}\nGitHub: ${links.github}\nPortfólio: ${links.portfolio}\n` : ""}\nFico à disposição para conversar.\n\nAtenciosamente,\n${name}${candidate.phone ? `\n${candidate.phone}` : ""}${candidate.email ? `\n${candidate.email}` : ""}`,
+    };
+  }
+
+  async emailDraft(key: string, to: string, title: string) {
+    if (!this.extras.mailer || !this.extras.resume) {
+      await this.bot.message("O envio por e-mail ainda não está configurado no servidor (falta a senha de app do Gmail). Nada foi enviado."); return "E-mail não configurado.";
+    }
+    if (!this.candidate().fullName) { await this.bot.message("Preencha seu nome completo em /cadastro antes de enviar currículo por e-mail."); return "Complete o cadastro."; }
+    const previous = this.state.emails[key];
+    if (previous && ["sending", "sent"].includes(previous.status)) {
+      await this.bot.message(`Currículo já ${previous.status === "sent" ? `enviado para ${previous.to} em ${new Date(previous.sentAt!).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : "em envio"}. Não será repetido.`); return "Já enviado.";
+    }
+    const { subject, body } = this.emailTemplate(title);
+    const draft = { to, subject, body, status: "draft" as const, nonce: randomBytes(8).toString("hex"), expiresAt: Date.now() + 30 * 60000 };
+    this.state.emails[key] = draft; await this.bot.save();
+    await this.bot.message(`Rascunho de e-mail\n\nPara: ${to}\nAssunto: ${subject}\nAnexo: currículo em PDF\n\n${body}\n\nConfira o destinatário. Vale por 30 minutos.`, {
+      inline_keyboard: [[{ text: `Enviar para ${to}`, callback_data: `enviar:${key}:${draft.nonce}` }], [{ text: "Descartar", callback_data: `descartar:${key}` }]],
+    });
+    return "Confira o rascunho e confirme.";
+  }
+
+  async emailForVacancy(id: string) {
+    const entry = this.bot.state.entries[id];
+    const to = entry && recruiterEmails(entry.vacancy.description)[0];
+    if (!to) return "Esta vaga não informa e-mail de contato.";
+    return this.emailDraft(id, to, entry.vacancy.title);
+  }
+
+  async emailCommand(text: string) {
+    const match = /^([^\s@]+@[^\s@]+\.[^\s@]+)\s+(.{3,160})$/s.exec(text.trim());
+    const to = match && z.email().safeParse(match[1].toLowerCase());
+    if (!match || !to?.success) {
+      await this.bot.message("Para enviar seu currículo por e-mail:\n/email recrutador@empresa.com Título da vaga\n\nO bot mostra o e-mail completo antes; nada é enviado sem sua confirmação."); return "Formato inválido.";
+    }
+    return this.emailDraft(digest({ to: to.data, title: match[2].trim() }).slice(0, 24), to.data, match[2].trim());
+  }
+
+  async sendEmail(data: string) {
+    const [key, nonce] = data.split(":");
+    const draft = this.state.emails[key];
+    if (!draft || draft.status !== "draft" || draft.nonce !== nonce || draft.expiresAt < Date.now()) return "Rascunho vencido ou já usado. Gere outro.";
+    if (!this.extras.mailer || !this.extras.resume) return "E-mail não configurado.";
+    // Gravar antes de enviar: um timeout não pode causar um segundo e-mail ao recrutador.
+    draft.status = "sending"; await this.bot.save();
+    try {
+      await this.extras.mailer.send({ to: draft.to, subject: draft.subject, text: draft.body, pdf: await this.extras.resume() });
+      draft.status = "sent"; draft.sentAt = new Date().toISOString(); await this.bot.save();
+      await this.bot.message(`Currículo enviado para ${draft.to}.\nAssunto: ${draft.subject}`);
+      return "E-mail enviado.";
+    } catch (error) {
+      draft.status = "failed"; draft.error = failure(error); await this.bot.save();
+      console.error(`Envio de e-mail não confirmado: ${draft.error}.`);
+      await this.bot.message(`O e-mail para ${draft.to} não foi confirmado pelo Gmail (${draft.error}). Confira a pasta Enviados antes de tentar de novo.`);
+      return "Envio não confirmado.";
+    }
+  }
+
   draft(id: string) {
     const app = this.state.applications[id];
     if (!app?.snapshot) throw new Error("Revisão indisponível.");
@@ -159,7 +324,7 @@ export class ApplicationFlow {
     const client = this.client();
     const fresh = await client.preview(gupyTarget(this.bot.state.entries[id].vacancy).jobId);
     if (digest(fresh) !== digest(draft.preview)) return "O currículo ou a vaga mudou na Gupy. Prepare uma nova revisão.";
-    if (draft.phase === "complete" && app.applicationId) {
+    if (draft.phase === "complete" && app.applicationId && !app.oneTap) {
       const details = await client.details(app.applicationId);
       if (details.registrationComplete) {
         await this.refresh(id);
@@ -176,7 +341,15 @@ export class ApplicationFlow {
     let mutationStarted = false;
     try {
       mutationStarted = true;
-      if (draft.phase === "start") {
+      if (app.oneTap) {
+        if (draft.phase === "start") {
+          const receipt = await client.start(gupyTarget(this.bot.state.entries[id].vacancy).jobId);
+          app.applicationId = receipt.applicationId; app.registerStepId = receipt.registerStepId;
+          app.status = "pending"; await this.bot.save();
+        } else app.status = "pending";
+        await this.finishOneTap(id, draft.preview.fields);
+        mutationStarted = false;
+      } else if (draft.phase === "start") {
         const receipt = await client.start(gupyTarget(this.bot.state.entries[id].vacancy).jobId);
         app.applicationId = receipt.applicationId; app.registerStepId = receipt.registerStepId;
         app.status = "pending"; app.snapshot = undefined; await this.bot.save();
@@ -195,11 +368,18 @@ export class ApplicationFlow {
       return "Resposta da Gupy registrada. Confira a mensagem do bot.";
     } catch (error) {
       if (!mutationStarted) return "Operação registrada, mas o aviso não foi entregue. Use /pendencias para consultar.";
-      if (mutationStarted) {
-        app.status = error instanceof GupyRequestError && [400, 401, 403, 422].includes(error.status) ? (app.applicationId ? "pending" : "cancelled") : "unknown";
-        await this.bot.save();
-      }
-      await this.bot.message(`A Gupy não confirmou a conclusão. ${this.status(id)}.\nConfira as perguntas, documentos e a sessão diretamente na plataforma. O bot não repetirá um envio de resultado incerto.\n${this.applicationUrl(id)}`);
+      app.error = failure(error);
+      app.status = error instanceof GupyRequestError && [400, 401, 403, 422].includes(error.status) ? (app.applicationId ? "pending" : "cancelled") : app.applicationId ? "pending" : "unknown";
+      await this.bot.save();
+      console.error(`Candidatura não confirmada: ${app.error}. Dados omitidos.`);
+      // Resultado incerto: consulta a conta antes de decidir; nunca reenvia às cegas.
+      try { await this.reconcile(id); } catch { /* mantém "unknown"; a próxima tentativa reconcilia de novo */ }
+      const created = Boolean(app.applicationId);
+      await this.bot.message(app.status === "unknown"
+        ? `A Gupy não respondeu (${app.error}). Não foi possível confirmar se a inscrição foi criada. Toque em Candidatar de novo mais tarde: o bot confere na sua conta antes de repetir.\n${this.applicationUrl(id)}`
+        : created
+          ? `Inscrição criada, mas a conclusão não foi confirmada (${app.error}). Termine pela Gupy ou toque em Candidatar de novo.\n${this.applicationUrl(id)}`
+          : `A Gupy recusou a inscrição (${app.error}). Nada foi criado na sua conta. Você pode tocar em Candidatar de novo ou se inscrever pelo site.\n${this.applicationUrl(id)}`);
       return "Envio não confirmado. Confira a mensagem do bot.";
     }
   }
